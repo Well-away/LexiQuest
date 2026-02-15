@@ -3,10 +3,11 @@ using DG.Tweening;
 
 public class CardInteraction : MonoBehaviour
 {
-    // The MAGIC: A shared 'static' variable that remembers which card is currently zoomed across the whole game
+    // The MAGIC: Shared variables across all cards
     public static CardInteraction currentlyZoomedCard; 
+    public static CardInteraction currentlyPlayedCard; // NEW: Remembers the 1 card currently in the display area
 
-    // 0 = In Hand, 1 = Zoomed, 2 = Played (In Spelling Area)
+    // 0 = In Hand, 1 = Zoomed, 2 = Played
     private int cardState = 0; 
     private Vector3 originalScale;
     private int originalIndex;
@@ -24,50 +25,68 @@ public class CardInteraction : MonoBehaviour
     {
         if (cardState == 0)
         {
-            // NEW LOGIC: Check if another card is already zoomed
+            // TAP 1: Zoom In
             if (currentlyZoomedCard != null && currentlyZoomedCard != this)
             {
-                // Tell the other card to shrink back down
                 currentlyZoomedCard.Unzoom(); 
             }
 
-            // TAP 1: Zoom In
             transform.DOScale(originalScale * 1.5f, 0.2f);
             cardState = 1;
-
-            // Register THIS card as the official zoomed card
             currentlyZoomedCard = this; 
         }
         else if (cardState == 1)
         {
-            // TAP 2: Move to Spelling Area
+            // TAP 2: Move to Display Area (Only 1 allowed!)
+            
+            // NEW: If there is ALREADY a card in the display area, send it back!
+            if (currentlyPlayedCard != null && currentlyPlayedCard != this)
+            {
+                currentlyPlayedCard.ReturnToHand();
+            }
+
             originalIndex = transform.GetSiblingIndex(); 
             
             transform.SetParent(inputDisplayArea, false);
             transform.DOScale(originalScale, 0.2f); 
             
-            cardState = 2; // Mark as played
-            
-            // Clear the static slot so the player can pick a new letter from their hand
+            cardState = 2; 
             currentlyZoomedCard = null; 
+            
+            // Register THIS card as the official played card
+            currentlyPlayedCard = this;
         }
         else if (cardState == 2)
         {
-            // TAP 3: Undo! Return to Hand
-            transform.SetParent(handContainer, false);
-            transform.SetSiblingIndex(originalIndex); 
-            
-            cardState = 0; 
+            // TAP 3: Undo!
+            ReturnToHand();
         }
     }
 
-    // A small helper method that other cards can trigger
+    // Helper method to shrink back down
     public void Unzoom()
     {
         if (cardState == 1)
         {
             transform.DOScale(originalScale, 0.2f);
             cardState = 0;
+        }
+    }
+
+    // NEW: Helper method so cards can safely kick each other back to the hand
+    public void ReturnToHand()
+    {
+        if (cardState == 2)
+        {
+            transform.SetParent(handContainer, false);
+            transform.SetSiblingIndex(originalIndex); 
+            cardState = 0;
+            
+            // If this was the official played card, clear the slot so it's empty
+            if (currentlyPlayedCard == this)
+            {
+                currentlyPlayedCard = null;
+            }
         }
     }
 }
