@@ -15,6 +15,8 @@ public class CardInteraction : MonoBehaviour
 
     public TMP_InputField wordInputField;
 
+    public GameObject spellInputPanel;
+
     private int cardState = 0; 
     private Vector3 originalScale;
     private int originalIndex;
