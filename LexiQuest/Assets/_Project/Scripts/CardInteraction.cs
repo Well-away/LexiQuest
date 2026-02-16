@@ -1,13 +1,20 @@
 using UnityEngine;
 using DG.Tweening;
+using TMPro;
 
 public class CardInteraction : MonoBehaviour
 {
     // The MAGIC: Shared variables across all cards
     public static CardInteraction currentlyZoomedCard; 
-    public static CardInteraction currentlyPlayedCard; // NEW: Remembers the 1 card currently in the display area
+    public static CardInteraction currentlyPlayedCard; 
 
+    //TMPro Letter randomizer
+    public TextMeshProUGUI letterTextUI;
+    public char currentLetter;
     // 0 = In Hand, 1 = Zoomed, 2 = Played
+
+    public TMP_InputField wordInputField;
+
     private int cardState = 0; 
     private Vector3 originalScale;
     private int originalIndex;
@@ -19,6 +26,15 @@ public class CardInteraction : MonoBehaviour
     {
         originalScale = transform.localScale;
         handContainer = transform.parent; 
+
+        string alphabet = "ABCDEFGHIJKLMNOPRSTUVWY";
+        int randomIndex = Random.Range(0, alphabet.Length);
+        
+        // Grab the letter at that random slot
+        currentLetter = alphabet[randomIndex];
+
+        // Change the actual text on the physical card!
+        letterTextUI.text = currentLetter.ToString();
     }
 
     public void OnCardTapped()
@@ -55,6 +71,14 @@ public class CardInteraction : MonoBehaviour
             
             // Register THIS card as the official played card
             currentlyPlayedCard = this;
+
+            if (wordInputField != null)
+            {
+                wordInputField.gameObject.SetActive(true); // Turn it on
+                wordInputField.text = currentLetter.ToString(); // Pre-fill the first letter
+                wordInputField.ActivateInputField(); // Put the blinking cursor inside it automatically
+                wordInputField.MoveTextEnd(false); // Move cursor to the end of the letter
+            }
         }
         else if (cardState == 2)
         {
@@ -86,6 +110,12 @@ public class CardInteraction : MonoBehaviour
             if (currentlyPlayedCard == this)
             {
                 currentlyPlayedCard = null;
+
+                if (wordInputField != null)
+                {
+                    wordInputField.gameObject.SetActive(false);
+                    wordInputField.text = ""; // Clear the text
+                }
             }
         }
     }
