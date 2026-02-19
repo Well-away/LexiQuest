@@ -11,17 +11,15 @@ public class WordManager : MonoBehaviour
     [Header("Card Spawning")]
     public GameObject cardPrefab; 
     public Transform handContainer; 
-    public int startingHandSize = 5; // NEW: Set how many cards you start with
+    public int startingHandSize = 5; 
 
     void Start()
     {
-        // Hide the panel at the very start of the game just in case
         if (spellInputPanel != null)
         {
             spellInputPanel.SetActive(false);
         }
 
-        // Deal the initial hand automatically!
         for (int i = 0; i < startingHandSize; i++)
         {
             DrawNewCard();
@@ -33,12 +31,19 @@ public class WordManager : MonoBehaviour
         if (CardInteraction.currentlyPlayedCard != null)
         {
             string submittedWord = wordInputField.text;
+
+            // NEW: Stop the player from just submitting the single letter!
+            if (submittedWord.Length <= 1)
+            {
+                Debug.LogWarning("Word is too short! You must type something.");
+                return; // Cancels the submission
+            }
+
             Debug.Log("Player cast spell with word: " + submittedWord);
 
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
-            // Draw a new card using our new helper method
             DrawNewCard();
 
             wordInputField.text = "";
@@ -49,7 +54,6 @@ public class WordManager : MonoBehaviour
         }
     }
 
-    // A clean helper method to handle all the spawning and mapping
     public void DrawNewCard()
     {
         GameObject newCard = Instantiate(cardPrefab, handContainer, false);
@@ -59,5 +63,30 @@ public class WordManager : MonoBehaviour
         newCardScript.inputDisplayArea = this.inputDisplayArea;
         newCardScript.wordInputField = this.wordInputField;
         newCardScript.spellInputPanel = this.spellInputPanel; 
+    }
+
+    // --- NEW: The strict keystroke watcher ---
+    public void EnforceStartingLetter(string currentText)
+    {
+        // Don't do anything if no card is played yet
+        if (CardInteraction.currentlyPlayedCard == null) return;
+
+        char requiredLetter = CardInteraction.currentlyPlayedCard.currentLetter;
+
+        // 1. Did the player delete the whole box? Force the letter back!
+        if (string.IsNullOrEmpty(currentText))
+        {
+            wordInputField.text = requiredLetter.ToString();
+            wordInputField.MoveTextEnd(false); // Push the blinking cursor to the right
+            return;
+        }
+
+        // 2. Did they somehow change the first letter? (e.g. pasted a word)
+        // We compare them as uppercase so 'a' and 'A' are treated the same
+        if (char.ToUpper(currentText[0]) != char.ToUpper(requiredLetter))
+        {
+            // Keep whatever else they typed, but force the correct letter to the front
+            wordInputField.text = requiredLetter.ToString() + currentText.Substring(1);
+        }
     }
 }
