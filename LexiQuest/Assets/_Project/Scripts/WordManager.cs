@@ -160,12 +160,13 @@ public class WordManager : MonoBehaviour
     {
         Debug.Log("Player ended their turn!");
 
+        // 1. Return played card to hand if left there
         if (CardInteraction.currentlyPlayedCard != null)
         {
             CardInteraction.currentlyPlayedCard.ReturnToHand();
         }
 
-        // --- NEW: Destroy unstarred cards and keep the starred ones! ---
+        // 2. Destroy unstarred cards and un-star the saved ones
         foreach (Transform child in handContainer)
         {
             CardInteraction card = child.GetComponent<CardInteraction>();
@@ -173,40 +174,46 @@ public class WordManager : MonoBehaviour
             {
                 if (!card.isStarred)
                 {
-                    Destroy(child.gameObject); // Trash it!
+                    Destroy(child.gameObject); 
                 }
                 else
                 {
-                    card.RemoveStar(); // Remove the star visual for the next round
+                    card.RemoveStar(); 
                 }
             }
         }
-        // ---------------------------------------------------------------
 
-        // Ink Math (Patch 1, 2, & 3)
+        // --- UPDATED: Ink Math with Diminishing Returns ---
         if (currentInk == 0)
         {
             currentInk += 7; 
+            Debug.Log("Ink depleted! Bonus Refill: +7 Ink");
+        }
+        else if (currentInk >= 10) // NEW PATCH: If 10 or more, only give 3!
+        {
+            currentInk += 3;
+            Debug.Log("High Ink! Diminishing returns: +3 Ink");
         }
         else
         {
             currentInk += 5; 
+            Debug.Log("Standard Refill: +5 Ink");
         }
 
+        // Cap it at the maximum
         if (currentInk > maxInk) currentInk = maxInk;
-        UpdateInkUI();
         
-        // --- UPDATED: Smart Hand Refill using the starred cards count ---
-        // We use cardsStarredThisTurn instead of childCount because Destroy() 
-        // doesn't update childCount until the very end of the frame!
+        UpdateInkUI();
+        // --------------------------------------------------
+        
+        // 4. Smart Hand Refill
         int cardsNeeded = startingHandSize - cardsStarredThisTurn;
         for (int i = 0; i < cardsNeeded; i++)
         {
             DrawNewCard();
         }
         
-        // Reset the star limit for the new turn
+        // 5. Reset the star limit for the new turn
         cardsStarredThisTurn = 0; 
-        // ----------------------------------------------------------------
     }
 }

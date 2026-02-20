@@ -80,39 +80,47 @@ public class CardInteraction : MonoBehaviour
 
     public void ToggleStar()
     {
-        // --- NEW: Safety Check! ---
-        // If the card is NOT resting in the hand (State 0), ignore the click!
+        Debug.Log("Star button was clicked on letter: " + currentLetter);
+
+        // Safety Check 1: Is it in the hand?
         if (cardState != 0)
         {
-            Debug.LogWarning("Cannot star a card that is selected or in the spelling area!");
-            return; // This stops the rest of the code from running
+            Debug.LogWarning("Cannot star! Card is currently zoomed or played.");
+            return; 
         }
-        // --------------------------
 
-        // If it is ALREADY starred, we un-star it and refund the Ink!
+        // Safety Check 2: Did WordManager successfully link up?
+        if (WordManager.instance == null)
+        {
+            Debug.LogError("WordManager instance is missing! Cannot check Ink.");
+            return;
+        }
+
         if (isStarred)
         {
+            Debug.Log("Un-starring card and refunding 1 Ink.");
             isStarred = false;
             if (starVisualActive != null) starVisualActive.SetActive(false);
             
-            WordManager.instance.currentInk += 1; // Refund 1 Ink
-            WordManager.instance.cardsStarredThisTurn -= 1; // Free up a star slot
+            WordManager.instance.currentInk += 1; 
+            WordManager.instance.cardsStarredThisTurn -= 1; 
             WordManager.instance.UpdateInkUI();
         }
         else
         {
             if (WordManager.instance.currentInk >= 1 && WordManager.instance.cardsStarredThisTurn < 2)
             {
+                Debug.Log("Starring card! Paying 1 Ink.");
                 isStarred = true;
                 if (starVisualActive != null) starVisualActive.SetActive(true);
                 
-                WordManager.instance.currentInk -= 1; // Pay 1 Ink
-                WordManager.instance.cardsStarredThisTurn += 1; // Take up a star slot
+                WordManager.instance.currentInk -= 1; 
+                WordManager.instance.cardsStarredThisTurn += 1; 
                 WordManager.instance.UpdateInkUI();
             }
             else
             {
-                Debug.LogWarning("Cannot star card! Either out of Ink or hit the 2-star limit.");
+                Debug.LogWarning("Cannot star! Ink: " + WordManager.instance.currentInk + " | Stars this turn: " + WordManager.instance.cardsStarredThisTurn);
             }
         }
     }
