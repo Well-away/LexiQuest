@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using System.Collections.Generic;
 
 public class WordManager : MonoBehaviour
 {
@@ -93,6 +94,31 @@ public class WordManager : MonoBehaviour
 
     public void DrawNewCard()
     {
+        // 1. Create the alphabet pool (Patch 1: X and Z removed!)
+        string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWY"; 
+        List<char> availableLetters = new List<char>(alphabet.ToCharArray());
+
+        // 2. Patch 2: Look at the current hand and cross off letters we already have
+        foreach (Transform child in handContainer)
+        {
+            CardInteraction existingCard = child.GetComponent<CardInteraction>();
+            // We check if it has a letter assigned so we don't count empty data
+            if (existingCard != null && existingCard.currentLetter != '\0')
+            {
+                availableLetters.Remove(existingCard.currentLetter);
+            }
+        }
+
+        // Safety fallback: If we somehow run out of unique letters, refill the pool
+        if (availableLetters.Count == 0)
+        {
+            availableLetters = new List<char>(alphabet.ToCharArray());
+        }
+
+        // 3. Pick a random unique letter from the remaining options
+        char chosenLetter = availableLetters[Random.Range(0, availableLetters.Count)];
+
+        // 4. Spawn the card
         GameObject newCard = Instantiate(cardPrefab, handContainer, false);
         newCard.transform.localScale = Vector3.one;
         
@@ -100,6 +126,9 @@ public class WordManager : MonoBehaviour
         newCardScript.inputDisplayArea = this.inputDisplayArea;
         newCardScript.wordInputField = this.wordInputField;
         newCardScript.spellInputPanel = this.spellInputPanel; 
+        
+        // 5. Hand the unique letter down to the newly spawned card!
+        newCardScript.InitializeCardData(chosenLetter);
     }
 
     public void EnforceStartingLetter(string currentText)

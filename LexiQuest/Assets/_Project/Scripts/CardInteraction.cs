@@ -42,7 +42,7 @@ public class CardInteraction : MonoBehaviour
         cardCanvas = GetComponent<Canvas>();
 
         // 1. Random Letter Logic
-        string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        /*string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         int randomLetterIndex = Random.Range(0, alphabet.Length);
         currentLetter = alphabet[randomLetterIndex];
         if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
@@ -57,6 +57,24 @@ public class CardInteraction : MonoBehaviour
         // ----------------------------------
 
         inkCost = Random.Range(1, 4); // Assigns a random cost of 1, 2, or 3
+        if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
+        */
+    }
+
+    public void InitializeCardData(char assignedLetter)
+    {
+        // 1. Accept the unique letter from the dealer
+        currentLetter = assignedLetter;
+        if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
+
+        // 2. Roll for a random spell
+        string[] availableSpells = { "Fireball", "Ice Shards", "Wind Blades", "Bubble Shield", "Revitalize" };
+        int randomSpellIndex = Random.Range(0, availableSpells.Length); 
+        currentSpell = availableSpells[randomSpellIndex];
+        if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
+
+        // 3. Roll for a random Ink cost
+        inkCost = Random.Range(1, 4); 
         if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
     }
 
