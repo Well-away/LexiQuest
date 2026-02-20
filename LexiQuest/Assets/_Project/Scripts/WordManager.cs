@@ -3,6 +3,14 @@ using TMPro;
 
 public class WordManager : MonoBehaviour
 {
+    public static WordManager instance;
+
+    private void Awake()
+    {
+        // This locks the instance in the moment the game starts
+        if (instance == null) instance = this;
+    }
+
     [Header("UI References")]
     public TMP_InputField wordInputField;
     public Transform inputDisplayArea;
@@ -15,20 +23,16 @@ public class WordManager : MonoBehaviour
 
     // --- NEW: Ink System Variables ---
     [Header("Ink System")]
-    public int maxInk = 10; 
+    public int maxInk = 15; 
     public int currentInk; // Removed the "= 10" because we will set it in Start()
     public TextMeshProUGUI totalInkTextUI;
     // ---------------------------------
 
+    public int cardsStarredThisTurn = 0;
     void Start()
     {
-        if (spellInputPanel != null)
-        {
-            spellInputPanel.SetActive(false);
-        }
-
-        // Initialize the UI on screen
-        currentInk = maxInk;
+        if (spellInputPanel != null) spellInputPanel.SetActive(false);
+        currentInk = 5; 
         UpdateInkUI();
 
         for (int i = 0; i < startingHandSize; i++)
@@ -117,38 +121,63 @@ public class WordManager : MonoBehaviour
     }
 
     // --- NEW: Helper method to update the text on screen ---
-    private void UpdateInkUI()
+    // --- UPDATED: Made public so the cards can trigger it when starred! ---
+    public void UpdateInkUI()
     {
-        if (totalInkTextUI != null)
-        {
-            totalInkTextUI.text = currentInk.ToString();
-        }
+        if (totalInkTextUI != null) totalInkTextUI.text = currentInk.ToString();
     }
 
     public void EndTurn()
     {
-        Debug.Log("Player ended their turn! Enemy turn begins...");
+        Debug.Log("Player ended their turn!");
 
-        // 1. If the player left a card in the spelling area, force it back to their hand!
         if (CardInteraction.currentlyPlayedCard != null)
         {
             CardInteraction.currentlyPlayedCard.ReturnToHand();
         }
 
-        // 2. (Here is where we will eventually tell the Enemy to attack Amy!)
+        // --- NEW: Destroy unstarred cards and keep the starred ones! ---
+        foreach (Transform child in handContainer)
+        {
+            CardInteraction card = child.GetComponent<CardInteraction>();
+            if (card != null)
+            {
+                if (!card.isStarred)
+                {
+                    Destroy(child.gameObject); // Trash it!
+                }
+                else
+                {
+                    card.RemoveStar(); // Remove the star visual for the next round
+                }
+            }
+        }
+        // ---------------------------------------------------------------
 
-        // 3. Enemy finishes attacking, player's turn starts again:
-        // Refill the Ink back to the maximum
-        currentInk = maxInk;
+        // Ink Math (Patch 1, 2, & 3)
+        if (currentInk == 0)
+        {
+            currentInk += 7; 
+        }
+        else
+        {
+            currentInk += 5; 
+        }
+
+        if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
         
-        int cardsNeeded = startingHandSize - handContainer.childCount;
-        
+        // --- UPDATED: Smart Hand Refill using the starred cards count ---
+        // We use cardsStarredThisTurn instead of childCount because Destroy() 
+        // doesn't update childCount until the very end of the frame!
+        int cardsNeeded = startingHandSize - cardsStarredThisTurn;
         for (int i = 0; i < cardsNeeded; i++)
         {
             DrawNewCard();
         }
-
-        Debug.Log("Player's turn starts again! Ink restored.");
+        
+        // Reset the star limit for the new turn
+        cardsStarredThisTurn = 0; 
+        // ----------------------------------------------------------------
     }
 }

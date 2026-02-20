@@ -31,6 +31,10 @@ public class CardInteraction : MonoBehaviour
     private Transform handContainer;
     private Canvas cardCanvas; 
 
+    [Header("Star System")]
+    public bool isStarred = false;
+    public GameObject starVisualActive; // The yellow star icon to show it is locked in
+
     void Start()
     {
         originalScale = transform.localScale;
@@ -54,6 +58,43 @@ public class CardInteraction : MonoBehaviour
 
         inkCost = Random.Range(1, 4); // Assigns a random cost of 1, 2, or 3
         if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
+    }
+
+    public void ToggleStar()
+    {
+        // If it is ALREADY starred, we un-star it and refund the Ink!
+        if (isStarred)
+        {
+            isStarred = false;
+            if (starVisualActive != null) starVisualActive.SetActive(false);
+            
+            WordManager.instance.currentInk += 1; // Refund 1 Ink
+            WordManager.instance.cardsStarredThisTurn -= 1; // Free up a star slot
+            WordManager.instance.UpdateInkUI();
+        }
+        // If it is NOT starred, check if we have Ink and haven't hit the limit
+        else
+        {
+            if (WordManager.instance.currentInk >= 1 && WordManager.instance.cardsStarredThisTurn < 2)
+            {
+                isStarred = true;
+                if (starVisualActive != null) starVisualActive.SetActive(true);
+                
+                WordManager.instance.currentInk -= 1; // Pay 1 Ink
+                WordManager.instance.cardsStarredThisTurn += 1; // Take up a star slot
+                WordManager.instance.UpdateInkUI();
+            }
+            else
+            {
+                Debug.LogWarning("Cannot star card! Either out of Ink or hit the 2-star limit.");
+            }
+        }
+    }
+
+    public void RemoveStar()
+    {
+        isStarred = false;
+        if (starVisualActive != null) starVisualActive.SetActive(false);
     }
 
     public void OnCardTapped()
