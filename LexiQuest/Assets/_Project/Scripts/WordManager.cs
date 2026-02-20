@@ -68,6 +68,7 @@ public class WordManager : MonoBehaviour
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
+            /*
             if (handContainer.childCount == 0)
             {
                 Debug.Log("Hand is empty! Dealing a fresh set of cards.");
@@ -76,6 +77,7 @@ public class WordManager : MonoBehaviour
                     DrawNewCard();
                 }
             }
+            */
 
             wordInputField.text = "";
             if (spellInputPanel != null)
@@ -140,6 +142,13 @@ public class WordManager : MonoBehaviour
         currentInk = maxInk;
         UpdateInkUI();
         
+        int cardsNeeded = startingHandSize - handContainer.childCount;
+        
+        for (int i = 0; i < cardsNeeded; i++)
+        {
+            DrawNewCard();
+        }
+
         Debug.Log("Player's turn starts again! Ink restored.");
     }
 }
