@@ -32,20 +32,32 @@ public class WordManager : MonoBehaviour
         {
             string submittedWord = wordInputField.text;
 
-            // NEW: Stop the player from just submitting the single letter!
             if (submittedWord.Length <= 1)
             {
                 Debug.LogWarning("Word is too short! You must type something.");
-                return; // Cancels the submission
+                return; 
             }
 
             Debug.Log("Player cast spell with word: " + submittedWord);
 
+            // 1. Destroy the played card
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
-            DrawNewCard();
+            // --- NEW: The "Empty Hand" Check ---
+            // Since the played card was moved to the Input Display, 
+            // the Hand Container's child count is perfectly accurate!
+            if (handContainer.childCount == 0)
+            {
+                Debug.Log("Hand is empty! Dealing a fresh set of cards.");
+                for (int i = 0; i < startingHandSize; i++)
+                {
+                    DrawNewCard();
+                }
+            }
+            // -----------------------------------
 
+            // 3. Reset the UI for the next turn
             wordInputField.text = "";
             if (spellInputPanel != null)
             {
