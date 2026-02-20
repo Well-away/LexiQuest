@@ -15,8 +15,9 @@ public class WordManager : MonoBehaviour
 
     // --- NEW: Ink System Variables ---
     [Header("Ink System")]
-    public int currentInk = 10; // The player starts with 10 Ink
-    public TextMeshProUGUI totalInkTextUI; // Links to your main UI
+    public int maxInk = 10; 
+    public int currentInk; // Removed the "= 10" because we will set it in Start()
+    public TextMeshProUGUI totalInkTextUI;
     // ---------------------------------
 
     void Start()
@@ -27,6 +28,7 @@ public class WordManager : MonoBehaviour
         }
 
         // Initialize the UI on screen
+        currentInk = maxInk;
         UpdateInkUI();
 
         for (int i = 0; i < startingHandSize; i++)
@@ -119,5 +121,25 @@ public class WordManager : MonoBehaviour
         {
             totalInkTextUI.text = currentInk.ToString();
         }
+    }
+
+    public void EndTurn()
+    {
+        Debug.Log("Player ended their turn! Enemy turn begins...");
+
+        // 1. If the player left a card in the spelling area, force it back to their hand!
+        if (CardInteraction.currentlyPlayedCard != null)
+        {
+            CardInteraction.currentlyPlayedCard.ReturnToHand();
+        }
+
+        // 2. (Here is where we will eventually tell the Enemy to attack Amy!)
+
+        // 3. Enemy finishes attacking, player's turn starts again:
+        // Refill the Ink back to the maximum
+        currentInk = maxInk;
+        UpdateInkUI();
+        
+        Debug.Log("Player's turn starts again! Ink restored.");
     }
 }
