@@ -1984,6 +1984,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2049496249536750442, guid: 15e7750555643c243894fae8a51dfa6f, type: 3}
+      propertyPath: m_Spacing
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 2049496249536750442, guid: 15e7750555643c243894fae8a51dfa6f, type: 3}
+      propertyPath: m_ChildAlignment
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2049496249536750442, guid: 15e7750555643c243894fae8a51dfa6f, type: 3}
+      propertyPath: m_ChildForceExpandWidth
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2210287476627426344, guid: 15e7750555643c243894fae8a51dfa6f, type: 3}
       propertyPath: wordInputField
       value: 

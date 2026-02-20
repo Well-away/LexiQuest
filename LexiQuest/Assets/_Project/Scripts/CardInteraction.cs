@@ -11,7 +11,6 @@ public class CardInteraction : MonoBehaviour
     public char currentLetter; 
 
     public TMP_InputField wordInputField; 
-    // NEW: Reference to the parent panel
     public GameObject spellInputPanel; 
 
     private int cardState = 0; 
@@ -20,11 +19,17 @@ public class CardInteraction : MonoBehaviour
 
     public Transform inputDisplayArea;
     private Transform handContainer;
+    
+    // NEW: We will grab the Canvas component to fix the rendering depth!
+    private Canvas cardCanvas; 
 
     void Start()
     {
         originalScale = transform.localScale;
         handContainer = transform.parent; 
+        
+        // Grab the Canvas we just added in the Inspector
+        cardCanvas = GetComponent<Canvas>();
 
         string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         int randomIndex = Random.Range(0, alphabet.Length);
@@ -41,6 +46,9 @@ public class CardInteraction : MonoBehaviour
                 currentlyZoomedCard.Unzoom(); 
             }
 
+            // --- THE FIX: Bring to front visually, not physically! ---
+            if (cardCanvas != null) cardCanvas.sortingOrder = 10; 
+
             transform.DOScale(originalScale * 1.5f, 0.2f);
             cardState = 1;
             currentlyZoomedCard = this; 
@@ -52,18 +60,22 @@ public class CardInteraction : MonoBehaviour
                 currentlyPlayedCard.ReturnToHand();
             }
 
+            // Save the exact index so we can put it back if canceled
             originalIndex = transform.GetSiblingIndex(); 
+            
             transform.SetParent(inputDisplayArea, false);
             transform.DOScale(originalScale, 0.2f); 
+            
+            // --- Reset the visual sorting order so it looks normal in the spell area ---
+            if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
             
             cardState = 2; 
             currentlyZoomedCard = null; 
             currentlyPlayedCard = this;
 
-            // --- UPDATED: Turn on the whole panel! ---
             if (spellInputPanel != null)
             {
-                spellInputPanel.SetActive(true); // Shows the box AND the button
+                spellInputPanel.SetActive(true);
                 wordInputField.text = currentLetter.ToString(); 
                 wordInputField.ActivateInputField(); 
                 wordInputField.MoveTextEnd(false); 
@@ -80,6 +92,10 @@ public class CardInteraction : MonoBehaviour
         if (cardState == 1)
         {
             transform.DOScale(originalScale, 0.2f);
+            
+            // --- THE FIX: Reset visual sorting order ---
+            if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
+            
             cardState = 0;
         }
     }
@@ -89,17 +105,16 @@ public class CardInteraction : MonoBehaviour
         if (cardState == 2)
         {
             transform.SetParent(handContainer, false);
-            transform.SetSiblingIndex(originalIndex); 
+            transform.SetSiblingIndex(originalIndex); // Put it exactly back where it belongs!
             cardState = 0;
             
             if (currentlyPlayedCard == this)
             {
                 currentlyPlayedCard = null;
                 
-                // --- UPDATED: Hide the whole panel if canceled ---
                 if (spellInputPanel != null)
                 {
-                    spellInputPanel.SetActive(false);
+                    spellInputPanel.SetActive(false); 
                     wordInputField.text = ""; 
                 }
             }
