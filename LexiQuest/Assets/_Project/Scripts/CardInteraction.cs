@@ -7,9 +7,16 @@ public class CardInteraction : MonoBehaviour
     public static CardInteraction currentlyZoomedCard; 
     public static CardInteraction currentlyPlayedCard; 
 
+    [Header("Card Data")]
     public TextMeshProUGUI letterTextUI; 
     public char currentLetter; 
+    
+    // --- NEW: Spell Data Variables ---
+    public TextMeshProUGUI spellNameTextUI; 
+    public string currentSpell; 
+    // ---------------------------------
 
+    [Header("UI References")]
     public TMP_InputField wordInputField; 
     public GameObject spellInputPanel; 
 
@@ -19,22 +26,28 @@ public class CardInteraction : MonoBehaviour
 
     public Transform inputDisplayArea;
     private Transform handContainer;
-    
-    // NEW: We will grab the Canvas component to fix the rendering depth!
     private Canvas cardCanvas; 
 
     void Start()
     {
         originalScale = transform.localScale;
         handContainer = transform.parent; 
-        
-        // Grab the Canvas we just added in the Inspector
         cardCanvas = GetComponent<Canvas>();
 
+        // 1. Random Letter Logic
         string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        int randomIndex = Random.Range(0, alphabet.Length);
-        currentLetter = alphabet[randomIndex];
-        letterTextUI.text = currentLetter.ToString();
+        int randomLetterIndex = Random.Range(0, alphabet.Length);
+        currentLetter = alphabet[randomLetterIndex];
+        if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
+
+        // --- NEW: 2. Random Spell Logic ---
+        string[] availableSpells = { "Fireball", "Ice Shards", "Wind Blades", "Bubble Shield", "Revitalize" };
+        int randomSpellIndex = Random.Range(0, availableSpells.Length); // Picks a number from 0 to 4
+        currentSpell = availableSpells[randomSpellIndex];
+        
+        // Update the physical text on the card
+        if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
+        // ----------------------------------
     }
 
     public void OnCardTapped()
@@ -46,7 +59,6 @@ public class CardInteraction : MonoBehaviour
                 currentlyZoomedCard.Unzoom(); 
             }
 
-            // --- THE FIX: Bring to front visually, not physically! ---
             if (cardCanvas != null) cardCanvas.sortingOrder = 10; 
 
             transform.DOScale(originalScale * 1.5f, 0.2f);
@@ -60,13 +72,11 @@ public class CardInteraction : MonoBehaviour
                 currentlyPlayedCard.ReturnToHand();
             }
 
-            // Save the exact index so we can put it back if canceled
             originalIndex = transform.GetSiblingIndex(); 
             
             transform.SetParent(inputDisplayArea, false);
             transform.DOScale(originalScale, 0.2f); 
             
-            // --- Reset the visual sorting order so it looks normal in the spell area ---
             if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
             
             cardState = 2; 
@@ -92,10 +102,7 @@ public class CardInteraction : MonoBehaviour
         if (cardState == 1)
         {
             transform.DOScale(originalScale, 0.2f);
-            
-            // --- THE FIX: Reset visual sorting order ---
             if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
-            
             cardState = 0;
         }
     }
@@ -105,7 +112,7 @@ public class CardInteraction : MonoBehaviour
         if (cardState == 2)
         {
             transform.SetParent(handContainer, false);
-            transform.SetSiblingIndex(originalIndex); // Put it exactly back where it belongs!
+            transform.SetSiblingIndex(originalIndex); 
             cardState = 0;
             
             if (currentlyPlayedCard == this)
