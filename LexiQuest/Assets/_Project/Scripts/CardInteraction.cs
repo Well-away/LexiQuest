@@ -62,6 +62,15 @@ public class CardInteraction : MonoBehaviour
 
     public void ToggleStar()
     {
+        // --- NEW: Safety Check! ---
+        // If the card is NOT resting in the hand (State 0), ignore the click!
+        if (cardState != 0)
+        {
+            Debug.LogWarning("Cannot star a card that is selected or in the spelling area!");
+            return; // This stops the rest of the code from running
+        }
+        // --------------------------
+
         // If it is ALREADY starred, we un-star it and refund the Ink!
         if (isStarred)
         {
@@ -72,7 +81,6 @@ public class CardInteraction : MonoBehaviour
             WordManager.instance.cardsStarredThisTurn -= 1; // Free up a star slot
             WordManager.instance.UpdateInkUI();
         }
-        // If it is NOT starred, check if we have Ink and haven't hit the limit
         else
         {
             if (WordManager.instance.currentInk >= 1 && WordManager.instance.cardsStarredThisTurn < 2)
