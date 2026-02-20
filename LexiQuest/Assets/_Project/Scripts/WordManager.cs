@@ -216,4 +216,56 @@ public class WordManager : MonoBehaviour
         // 5. Reset the star limit for the new turn
         cardsStarredThisTurn = 0; 
     }
+
+    // --- NEW: The Reshuffle Logic ---
+    public void ReshuffleSelectedCardLetter()
+    {
+        // 1. Make sure a card is actually sitting in the spelling area
+        if (CardInteraction.currentlyPlayedCard != null)
+        {
+            // 2. Check if they have the required 1 Ink
+            if (currentInk >= 1)
+            {
+                // Pay the cost
+                currentInk -= 1;
+                UpdateInkUI();
+
+                // 3. Dealer Logic: Get a unique letter
+                string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWY"; 
+                List<char> availableLetters = new List<char>(alphabet.ToCharArray());
+
+                foreach (Transform child in handContainer)
+                {
+                    CardInteraction existingCard = child.GetComponent<CardInteraction>();
+                    if (existingCard != null && existingCard.currentLetter != '\0')
+                    {
+                        availableLetters.Remove(existingCard.currentLetter);
+                    }
+                }
+                
+                // Make sure we don't accidentally roll the exact same letter it already has!
+                availableLetters.Remove(CardInteraction.currentlyPlayedCard.currentLetter);
+
+                if (availableLetters.Count == 0)
+                {
+                    availableLetters = new List<char>(alphabet.ToCharArray());
+                }
+
+                char newLetter = availableLetters[Random.Range(0, availableLetters.Count)];
+
+                // 4. Force the card to update its visual text
+                CardInteraction.currentlyPlayedCard.ChangeLetter(newLetter);
+
+                // 5. Instantly update the blinking text box so they can start typing!
+                wordInputField.text = newLetter.ToString();
+                wordInputField.MoveTextEnd(false); 
+                
+                Debug.Log("Spent 1 Ink. Reshuffled letter to: " + newLetter);
+            }
+            else
+            {
+                Debug.LogWarning("Not enough Ink to reshuffle this letter!");
+            }
+        }
+    }
 }

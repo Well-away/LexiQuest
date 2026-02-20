@@ -208,4 +208,11 @@ public class CardInteraction : MonoBehaviour
             }
         }
     }
+
+    // --- NEW: Helper to change the letter without touching the spell or ink cost! ---
+    public void ChangeLetter(char newLetter)
+    {
+        currentLetter = newLetter;
+        if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
+    }
 }
