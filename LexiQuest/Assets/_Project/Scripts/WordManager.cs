@@ -13,12 +13,21 @@ public class WordManager : MonoBehaviour
     public Transform handContainer; 
     public int startingHandSize = 5; 
 
+    // --- NEW: Ink System Variables ---
+    [Header("Ink System")]
+    public int currentInk = 10; // The player starts with 10 Ink
+    public TextMeshProUGUI totalInkTextUI; // Links to your main UI
+    // ---------------------------------
+
     void Start()
     {
         if (spellInputPanel != null)
         {
             spellInputPanel.SetActive(false);
         }
+
+        // Initialize the UI on screen
+        UpdateInkUI();
 
         for (int i = 0; i < startingHandSize; i++)
         {
@@ -38,15 +47,25 @@ public class WordManager : MonoBehaviour
                 return; 
             }
 
+            // --- NEW: Check if the player can afford the spell! ---
+            int costOfSpell = CardInteraction.currentlyPlayedCard.inkCost;
+            if (currentInk < costOfSpell)
+            {
+                Debug.LogWarning("Not enough Ink to cast this spell!");
+                // (Later, we can add a red flash to the Ink UI here!)
+                return; // Cancels the submission completely
+            }
+
+            // Deduct the ink and update the screen
+            currentInk -= costOfSpell;
+            UpdateInkUI();
+            // ------------------------------------------------------
+
             Debug.Log("Player cast spell with word: " + submittedWord);
 
-            // 1. Destroy the played card
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
-            // --- NEW: The "Empty Hand" Check ---
-            // Since the played card was moved to the Input Display, 
-            // the Hand Container's child count is perfectly accurate!
             if (handContainer.childCount == 0)
             {
                 Debug.Log("Hand is empty! Dealing a fresh set of cards.");
@@ -55,9 +74,7 @@ public class WordManager : MonoBehaviour
                     DrawNewCard();
                 }
             }
-            // -----------------------------------
 
-            // 3. Reset the UI for the next turn
             wordInputField.text = "";
             if (spellInputPanel != null)
             {
@@ -77,28 +94,30 @@ public class WordManager : MonoBehaviour
         newCardScript.spellInputPanel = this.spellInputPanel; 
     }
 
-    // --- NEW: The strict keystroke watcher ---
     public void EnforceStartingLetter(string currentText)
     {
-        // Don't do anything if no card is played yet
         if (CardInteraction.currentlyPlayedCard == null) return;
-
         char requiredLetter = CardInteraction.currentlyPlayedCard.currentLetter;
 
-        // 1. Did the player delete the whole box? Force the letter back!
         if (string.IsNullOrEmpty(currentText))
         {
             wordInputField.text = requiredLetter.ToString();
-            wordInputField.MoveTextEnd(false); // Push the blinking cursor to the right
+            wordInputField.MoveTextEnd(false); 
             return;
         }
 
-        // 2. Did they somehow change the first letter? (e.g. pasted a word)
-        // We compare them as uppercase so 'a' and 'A' are treated the same
         if (char.ToUpper(currentText[0]) != char.ToUpper(requiredLetter))
         {
-            // Keep whatever else they typed, but force the correct letter to the front
             wordInputField.text = requiredLetter.ToString() + currentText.Substring(1);
+        }
+    }
+
+    // --- NEW: Helper method to update the text on screen ---
+    private void UpdateInkUI()
+    {
+        if (totalInkTextUI != null)
+        {
+            totalInkTextUI.text = currentInk.ToString();
         }
     }
 }

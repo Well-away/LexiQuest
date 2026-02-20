@@ -11,10 +11,13 @@ public class CardInteraction : MonoBehaviour
     public TextMeshProUGUI letterTextUI; 
     public char currentLetter; 
     
-    // --- NEW: Spell Data Variables ---
+    
     public TextMeshProUGUI spellNameTextUI; 
     public string currentSpell; 
-    // ---------------------------------
+    
+    //New Ink Cost
+    public TextMeshProUGUI inkCostTextUI; 
+    public int inkCost;
 
     [Header("UI References")]
     public TMP_InputField wordInputField; 
@@ -48,6 +51,9 @@ public class CardInteraction : MonoBehaviour
         // Update the physical text on the card
         if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
         // ----------------------------------
+
+        inkCost = Random.Range(1, 4); // Assigns a random cost of 1, 2, or 3
+        if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
     }
 
     public void OnCardTapped()

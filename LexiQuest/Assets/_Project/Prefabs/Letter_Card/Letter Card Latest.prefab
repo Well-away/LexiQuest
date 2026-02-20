@@ -17,6 +17,10 @@ PrefabInstance:
       value: 65
       objectReference: {fileID: 0}
     - target: {fileID: -252196952760865602, guid: e409325995e2b55498a037d32f8042e5, type: 3}
+      propertyPath: inkCostTextUI
+      value: 
+      objectReference: {fileID: 8152877934704888621}
+    - target: {fileID: -252196952760865602, guid: e409325995e2b55498a037d32f8042e5, type: 3}
       propertyPath: spellNameTextUI
       value: 
       objectReference: {fileID: 6737724714081405561}
@@ -255,6 +259,17 @@ MonoBehaviour:
 --- !u!114 &7815559062443350251 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4854579631149892596, guid: e409325995e2b55498a037d32f8042e5, type: 3}
+  m_PrefabInstance: {fileID: 3398141820151798559}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+--- !u!114 &8152877934704888621 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6776871469125767218, guid: e409325995e2b55498a037d32f8042e5, type: 3}
   m_PrefabInstance: {fileID: 3398141820151798559}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}

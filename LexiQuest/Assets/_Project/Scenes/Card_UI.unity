@@ -1118,7 +1118,7 @@ GameObject:
   - component: {fileID: 1150483395}
   - component: {fileID: 1150483394}
   m_Layer: 5
-  m_Name: Number
+  m_Name: Ink Number
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1217,6 +1217,8 @@ MonoBehaviour:
   cardPrefab: {fileID: 2625638231514093201, guid: bc3021020a2abb74c8854710c768a76c, type: 3}
   handContainer: {fileID: 1580989455984030646}
   startingHandSize: 5
+  currentInk: 10
+  totalInkTextUI: {fileID: 685573115}
 --- !u!4 &1686993573
 Transform:
   m_ObjectHideFlags: 0
