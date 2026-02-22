@@ -11,7 +11,6 @@ public class CardInteraction : MonoBehaviour
     public TextMeshProUGUI letterTextUI; 
     public char currentLetter; 
     
-    
     public TextMeshProUGUI spellNameTextUI; 
     public string currentSpell; 
     
@@ -40,25 +39,6 @@ public class CardInteraction : MonoBehaviour
         originalScale = transform.localScale;
         handContainer = transform.parent; 
         cardCanvas = GetComponent<Canvas>();
-
-        // 1. Random Letter Logic
-        /*string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        int randomLetterIndex = Random.Range(0, alphabet.Length);
-        currentLetter = alphabet[randomLetterIndex];
-        if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
-
-        // --- NEW: 2. Random Spell Logic ---
-        string[] availableSpells = { "Fireball", "Ice Shards", "Wind Blades", "Bubble Shield", "Revitalize" };
-        int randomSpellIndex = Random.Range(0, availableSpells.Length); // Picks a number from 0 to 4
-        currentSpell = availableSpells[randomSpellIndex];
-        
-        // Update the physical text on the card
-        if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
-        // ----------------------------------
-
-        inkCost = Random.Range(1, 4); // Assigns a random cost of 1, 2, or 3
-        if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
-        */
     }
 
     public void InitializeCardData(char assignedLetter)
@@ -156,7 +136,10 @@ public class CardInteraction : MonoBehaviour
             originalIndex = transform.GetSiblingIndex(); 
             
             transform.SetParent(inputDisplayArea, false);
-            transform.DOScale(originalScale, 0.2f); 
+
+            // --- UPDATED: Tell it to stay zoomed (1.5x) in the center slot! ---
+            transform.DOScale(originalScale * 1.5f, 0.2f); 
+            // ------------------------------------------------------------------
             
             if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
             
@@ -194,6 +177,11 @@ public class CardInteraction : MonoBehaviour
         {
             transform.SetParent(handContainer, false);
             transform.SetSiblingIndex(originalIndex); 
+            
+            // --- NEW: Shrink the card back down to normal size smoothly! ---
+            transform.DOScale(originalScale, 0.2f);
+            // ---------------------------------------------------------------
+
             cardState = 0;
             
             if (currentlyPlayedCard == this)
@@ -209,7 +197,6 @@ public class CardInteraction : MonoBehaviour
         }
     }
 
-    // --- NEW: Helper to change the letter without touching the spell or ink cost! ---
     public void ChangeLetter(char newLetter)
     {
         currentLetter = newLetter;
