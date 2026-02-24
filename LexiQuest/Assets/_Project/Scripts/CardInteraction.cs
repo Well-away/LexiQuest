@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections; // NEW: Required for Coroutines
 using DG.Tweening;
 using TMPro; 
 
@@ -10,11 +11,8 @@ public class CardInteraction : MonoBehaviour
     [Header("Card Data")]
     public TextMeshProUGUI letterTextUI; 
     public char currentLetter; 
-    
     public TextMeshProUGUI spellNameTextUI; 
     public string currentSpell; 
-    
-    //New Ink Cost
     public TextMeshProUGUI inkCostTextUI; 
     public int inkCost;
 
@@ -32,7 +30,13 @@ public class CardInteraction : MonoBehaviour
 
     [Header("Star System")]
     public bool isStarred = false;
-    public GameObject starVisualActive; // The yellow star icon to show it is locked in
+    public GameObject starVisualActive; 
+
+    // --- UPDATED: Double Tap Timers & Logic ---
+    private float lastClickTime = -10f;
+    private float doubleClickThreshold = 0.3f; // Lowered to 0.3s for better responsiveness
+    private Coroutine tapCoroutine; // The "Wait and See" timer
+    // ------------------------------------------
 
     void Start()
     {
@@ -43,42 +47,25 @@ public class CardInteraction : MonoBehaviour
 
     public void InitializeCardData(char assignedLetter)
     {
-        // 1. Accept the unique letter from the dealer
         currentLetter = assignedLetter;
         if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
 
-        // 2. Roll for a random spell
         string[] availableSpells = { "Fireball", "Ice Shards", "Wind Blades", "Bubble Shield", "Revitalize" };
         int randomSpellIndex = Random.Range(0, availableSpells.Length); 
         currentSpell = availableSpells[randomSpellIndex];
         if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
 
-        // 3. Roll for a random Ink cost
         inkCost = Random.Range(1, 4); 
         if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
     }
 
     public void ToggleStar()
     {
-        Debug.Log("Star button was clicked on letter: " + currentLetter);
-
-        // Safety Check 1: Is it in the hand?
-        if (cardState != 0)
-        {
-            Debug.LogWarning("Cannot star! Card is currently zoomed or played.");
-            return; 
-        }
-
-        // Safety Check 2: Did WordManager successfully link up?
-        if (WordManager.instance == null)
-        {
-            Debug.LogError("WordManager instance is missing! Cannot check Ink.");
-            return;
-        }
+        if (cardState == 2) return; 
+        if (WordManager.instance == null) return;
 
         if (isStarred)
         {
-            Debug.Log("Un-starring card and refunding 1 Ink.");
             isStarred = false;
             if (starVisualActive != null) starVisualActive.SetActive(false);
             
@@ -90,17 +77,12 @@ public class CardInteraction : MonoBehaviour
         {
             if (WordManager.instance.currentInk >= 1 && WordManager.instance.cardsStarredThisTurn < 2)
             {
-                Debug.Log("Starring card! Paying 1 Ink.");
                 isStarred = true;
                 if (starVisualActive != null) starVisualActive.SetActive(true);
                 
                 WordManager.instance.currentInk -= 1; 
                 WordManager.instance.cardsStarredThisTurn += 1; 
                 WordManager.instance.UpdateInkUI();
-            }
-            else
-            {
-                Debug.LogWarning("Cannot star! Ink: " + WordManager.instance.currentInk + " | Stars this turn: " + WordManager.instance.cardsStarredThisTurn);
             }
         }
     }
@@ -111,7 +93,40 @@ public class CardInteraction : MonoBehaviour
         if (starVisualActive != null) starVisualActive.SetActive(false);
     }
 
+    // --- UPDATED: Tap Logic with Delay ---
     public void OnCardTapped()
+    {
+        if (Time.time - lastClickTime < doubleClickThreshold)
+        {
+            // We caught a double tap! Stop the single tap from happening.
+            if (tapCoroutine != null)
+            {
+                StopCoroutine(tapCoroutine);
+                tapCoroutine = null;
+            }
+            
+            ToggleStar();
+            lastClickTime = 0f; 
+            return; 
+        }
+        
+        lastClickTime = Time.time; 
+        
+        // Start the timer. If a second tap doesn't arrive in time, run the single tap logic!
+        tapCoroutine = StartCoroutine(ProcessSingleTap());
+    }
+
+    private IEnumerator ProcessSingleTap()
+    {
+        // Wait just enough time to give the player a chance to tap again
+        yield return new WaitForSeconds(doubleClickThreshold);
+        
+        // If we make it here without being interrupted, it was definitely a single tap!
+        ExecuteSingleTapLogic();
+    }
+    // --------------------------------------
+
+    private void ExecuteSingleTapLogic()
     {
         if (cardState == 0)
         {
@@ -133,13 +148,19 @@ public class CardInteraction : MonoBehaviour
                 currentlyPlayedCard.ReturnToHand();
             }
 
-            originalIndex = transform.GetSiblingIndex(); 
-            
-            transform.SetParent(inputDisplayArea, false);
+            if (isStarred)
+            {
+                isStarred = false;
+                if (starVisualActive != null) starVisualActive.SetActive(false);
+                
+                WordManager.instance.currentInk += 1; 
+                WordManager.instance.cardsStarredThisTurn -= 1; 
+                WordManager.instance.UpdateInkUI();
+            }
 
-            // --- UPDATED: Tell it to stay zoomed (1.5x) in the center slot! ---
+            originalIndex = transform.GetSiblingIndex(); 
+            transform.SetParent(inputDisplayArea, false);
             transform.DOScale(originalScale * 1.5f, 0.2f); 
-            // ------------------------------------------------------------------
             
             if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
             
@@ -168,6 +189,9 @@ public class CardInteraction : MonoBehaviour
             transform.DOScale(originalScale, 0.2f);
             if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
             cardState = 0;
+
+            // --- NEW: Clear the static reference so clicking background works perfectly ---
+            if (currentlyZoomedCard == this) currentlyZoomedCard = null;
         }
     }
 
@@ -178,9 +202,7 @@ public class CardInteraction : MonoBehaviour
             transform.SetParent(handContainer, false);
             transform.SetSiblingIndex(originalIndex); 
             
-            // --- NEW: Shrink the card back down to normal size smoothly! ---
             transform.DOScale(originalScale, 0.2f);
-            // ---------------------------------------------------------------
 
             cardState = 0;
             
