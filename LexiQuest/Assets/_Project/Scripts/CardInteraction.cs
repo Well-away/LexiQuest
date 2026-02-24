@@ -1,5 +1,6 @@
 using UnityEngine;
-using System.Collections; // NEW: Required for Coroutines
+using System.Collections; 
+using System.Collections.Generic; // NEW: Required for Lists and Dictionaries
 using DG.Tweening;
 using TMPro; 
 
@@ -32,11 +33,9 @@ public class CardInteraction : MonoBehaviour
     public bool isStarred = false;
     public GameObject starVisualActive; 
 
-    // --- UPDATED: Double Tap Timers & Logic ---
     private float lastClickTime = -10f;
-    private float doubleClickThreshold = 0.3f; // Lowered to 0.3s for better responsiveness
-    private Coroutine tapCoroutine; // The "Wait and See" timer
-    // ------------------------------------------
+    private float doubleClickThreshold = 0.3f; 
+    private Coroutine tapCoroutine; 
 
     void Start()
     {
@@ -50,12 +49,60 @@ public class CardInteraction : MonoBehaviour
         currentLetter = assignedLetter;
         if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
 
-        string[] availableSpells = { "Fireball", "Ice Shards", "Wind Blades", "Bubble Shield", "Revitalize" };
-        int randomSpellIndex = Random.Range(0, availableSpells.Length); 
-        currentSpell = availableSpells[randomSpellIndex];
+        // --- 1. Define Spell Categories ---
+        List<string> offensiveSpells = new List<string> { "Fireball", "Ice Shards", "Wind Blades" };
+        List<string> nonOffensiveSpells = new List<string> { "Bubble Shield", "Revitalize" };
+        
+        List<string> allAvailableSpells = new List<string>();
+        allAvailableSpells.AddRange(offensiveSpells);
+        allAvailableSpells.AddRange(nonOffensiveSpells);
+
+        // --- 2. Enforce the 2-Duplicate Limit ---
+        Dictionary<string, int> spellCounts = new Dictionary<string, int>();
+        
+        if (transform.parent != null) 
+        {
+            foreach (Transform child in transform.parent)
+            {
+                CardInteraction card = child.GetComponent<CardInteraction>();
+                if (card != null && card != this && !string.IsNullOrEmpty(card.currentSpell))
+                {
+                    if (spellCounts.ContainsKey(card.currentSpell))
+                        spellCounts[card.currentSpell]++;
+                    else
+                        spellCounts[card.currentSpell] = 1;
+                }
+            }
+        }
+
+        foreach (var kvp in spellCounts)
+        {
+            if (kvp.Value >= 2)
+            {
+                allAvailableSpells.Remove(kvp.Key); // Strip it from the pool!
+            }
+        }
+
+        // Fallback just in case the math gets weird and all spells are maxed out
+        if (allAvailableSpells.Count == 0) 
+        {
+            allAvailableSpells.AddRange(offensiveSpells);
+            allAvailableSpells.AddRange(nonOffensiveSpells);
+        }
+
+        currentSpell = allAvailableSpells[Random.Range(0, allAvailableSpells.Count)];
         if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
 
-        inkCost = Random.Range(1, 4); 
+        // --- 3. Enforce Ink Costs ---
+        if (offensiveSpells.Contains(currentSpell))
+        {
+            inkCost = Random.Range(2, 5); // 2, 3, or 4
+        }
+        else
+        {
+            inkCost = Random.Range(1, 4); // 1, 2, or 3
+        }
+
         if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
     }
 
@@ -93,15 +140,12 @@ public class CardInteraction : MonoBehaviour
         if (starVisualActive != null) starVisualActive.SetActive(false);
     }
 
-    // --- UPDATED: Tap Logic with Delay ---
     public void OnCardTapped()
     {
-        // 1. If the card is in the hand, we wait to see if it's a double-tap (Star)
         if (cardState == 0)
         {
             if (Time.time - lastClickTime < doubleClickThreshold)
             {
-                // We caught a double tap! Stop the single tap from happening.
                 if (tapCoroutine != null)
                 {
                     StopCoroutine(tapCoroutine);
@@ -109,14 +153,13 @@ public class CardInteraction : MonoBehaviour
                 }
                 
                 ToggleStar();
-                lastClickTime = -10f; // Force a perfect math reset so the next card works!
+                lastClickTime = -10f; 
                 return; 
             }
             
             lastClickTime = Time.time; 
             tapCoroutine = StartCoroutine(ProcessSingleTap());
         }
-        // 2. If the card is already zoomed (1) or played (2), NO DELAY! Execute instantly.
         else 
         {
             ExecuteSingleTapLogic();
@@ -125,15 +168,10 @@ public class CardInteraction : MonoBehaviour
 
     private IEnumerator ProcessSingleTap()
     {
-        // Wait just enough time to give the player a chance to tap again
         yield return new WaitForSeconds(doubleClickThreshold);
-        
-        tapCoroutine = null; // Clear the coroutine memory!
-        
-        // If we make it here without being interrupted, it was definitely a single tap!
+        tapCoroutine = null; 
         ExecuteSingleTapLogic();
     }
-    // --------------------------------------
 
     private void ExecuteSingleTapLogic()
     {
@@ -199,7 +237,6 @@ public class CardInteraction : MonoBehaviour
             if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
             cardState = 0;
 
-            // --- NEW: Clear the static reference so clicking background works perfectly ---
             if (currentlyZoomedCard == this) currentlyZoomedCard = null;
         }
     }
