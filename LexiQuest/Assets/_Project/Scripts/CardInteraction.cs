@@ -96,30 +96,39 @@ public class CardInteraction : MonoBehaviour
     // --- UPDATED: Tap Logic with Delay ---
     public void OnCardTapped()
     {
-        if (Time.time - lastClickTime < doubleClickThreshold)
+        // 1. If the card is in the hand, we wait to see if it's a double-tap (Star)
+        if (cardState == 0)
         {
-            // We caught a double tap! Stop the single tap from happening.
-            if (tapCoroutine != null)
+            if (Time.time - lastClickTime < doubleClickThreshold)
             {
-                StopCoroutine(tapCoroutine);
-                tapCoroutine = null;
+                // We caught a double tap! Stop the single tap from happening.
+                if (tapCoroutine != null)
+                {
+                    StopCoroutine(tapCoroutine);
+                    tapCoroutine = null;
+                }
+                
+                ToggleStar();
+                lastClickTime = -10f; // Force a perfect math reset so the next card works!
+                return; 
             }
             
-            ToggleStar();
-            lastClickTime = 0f; 
-            return; 
+            lastClickTime = Time.time; 
+            tapCoroutine = StartCoroutine(ProcessSingleTap());
         }
-        
-        lastClickTime = Time.time; 
-        
-        // Start the timer. If a second tap doesn't arrive in time, run the single tap logic!
-        tapCoroutine = StartCoroutine(ProcessSingleTap());
+        // 2. If the card is already zoomed (1) or played (2), NO DELAY! Execute instantly.
+        else 
+        {
+            ExecuteSingleTapLogic();
+        }
     }
 
     private IEnumerator ProcessSingleTap()
     {
         // Wait just enough time to give the player a chance to tap again
         yield return new WaitForSeconds(doubleClickThreshold);
+        
+        tapCoroutine = null; // Clear the coroutine memory!
         
         // If we make it here without being interrupted, it was definitely a single tap!
         ExecuteSingleTapLogic();
