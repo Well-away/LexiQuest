@@ -14,17 +14,20 @@ public class Enemy : MonoBehaviour
         healthBar.SetMaxHealth(maxHealth);
     }
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.K))
-        {
-            TakeDamage(20);
-        }
-    }
-
-    void TakeDamage(int damage)
+    public void TakeDamage(int damage)
     {
         currentHealth -= damage;
+        
+        // --- NEW: Prevent negative health! ---
+        if (currentHealth < 0) currentHealth = 0;
+        // -------------------------------------
+
         healthBar.SetHealth(currentHealth);
+        
+        // Optional: A quick check to see if the enemy is dead!
+        if (currentHealth == 0)
+        {
+            Debug.Log("Enemy Defeated!");
+        }
     }
 }

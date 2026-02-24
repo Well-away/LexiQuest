@@ -28,6 +28,10 @@ public class WordManager : MonoBehaviour
 
     public int cardsStarredThisTurn = 0;
     
+    [Header("Battle Targets")]
+    public player playerTarget; 
+    public Enemy enemyTarget;
+
     void Start()
     {
         if (spellInputPanel != null) spellInputPanel.SetActive(false);
@@ -46,9 +50,10 @@ public class WordManager : MonoBehaviour
         {
             string submittedWord = wordInputField.text;
 
-            if (submittedWord.Length <= 1)
+            // --- UPDATED: Reject words with 3 or fewer letters ---
+            if (submittedWord.Length <= 3)
             {
-                Debug.LogWarning("Word is too short! You must type something.");
+                Debug.LogWarning("Word is too short! Spells require at least 4 letters.");
                 return; 
             }
 
@@ -59,11 +64,46 @@ public class WordManager : MonoBehaviour
                 return; 
             }
 
+            // --- COMBAT MATH ---
+            string spellName = CardInteraction.currentlyPlayedCard.currentSpell;
+            int basePower = costOfSpell * 5; 
+            float multiplier = 1.0f;
+
+            // --- UPDATED: New Word Length Multipliers ---
+            if (submittedWord.Length == 4) multiplier = 1.0f;
+            else if (submittedWord.Length == 5) multiplier = 1.5f;
+            else if (submittedWord.Length == 6) multiplier = 2.0f;
+            else if (submittedWord.Length >= 7) multiplier = 2.5f;
+
+            int finalPower = Mathf.RoundToInt(basePower * multiplier);
+
+            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}'. Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>");
+
+            // --- ROUTE THE SPELL ---
+            if (spellName == "Fireball")
+            {
+                finalPower += 5; // Fireball gets a flat +5 damage bonus!
+                if (enemyTarget != null) enemyTarget.TakeDamage(finalPower);
+            }
+            else if (spellName == "Ice Shards" || spellName == "Wind Blades")
+            {
+                if (enemyTarget != null) enemyTarget.TakeDamage(finalPower);
+            }
+            else if (spellName == "Revitalize")
+            {
+                if (playerTarget != null) playerTarget.Heal(finalPower);
+            }
+            else if (spellName == "Bubble Shield")
+            {
+                if (playerTarget != null) playerTarget.AddShield(finalPower);
+            }
+            // ------------------------
+
+            // Pay the Ink Cost
             currentInk -= costOfSpell;
             UpdateInkUI();
 
-            Debug.Log("Player cast spell with word: " + submittedWord);
-
+            // Cleanup the Board
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
