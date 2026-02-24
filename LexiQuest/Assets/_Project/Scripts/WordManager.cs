@@ -172,53 +172,58 @@ public class WordManager : MonoBehaviour
 
     public void EndTurn()
     {
-        Debug.Log("Player ended their turn!");
-
         if (CardInteraction.currentlyPlayedCard != null)
         {
             CardInteraction.currentlyPlayedCard.ReturnToHand();
         }
+
+        int survivingCards = 0;
 
         foreach (Transform child in handContainer)
         {
             CardInteraction card = child.GetComponent<CardInteraction>();
             if (card != null)
             {
-                if (!card.isStarred)
+                // --- UPDATED: Handle Locked Cards ---
+                if (card.lockedTurnsLeft > 0)
+                {
+                    card.DecreaseLock();
+                    survivingCards++; // It takes up a slot in your hand!
+                }
+                else if (!card.isStarred)
                 {
                     Destroy(child.gameObject); 
                 }
                 else
                 {
                     card.RemoveStar(); 
+                    survivingCards++;
                 }
             }
         }
 
-        if (currentInk == 0)
-        {
-            currentInk += 7; 
-        }
-        else if (currentInk >= 10) 
-        {
-            currentInk += 3;
-        }
-        else
-        {
-            currentInk += 5; 
-        }
+        // Ink Math
+        if (currentInk == 0) currentInk += 7; 
+        else if (currentInk >= 10) currentInk += 3;
+        else currentInk += 5; 
 
         if (currentInk > maxInk) currentInk = maxInk;
-        
         UpdateInkUI();
         
-        int cardsNeeded = startingHandSize - cardsStarredThisTurn;
+        // Draw replacing cards
+        int cardsNeeded = startingHandSize - survivingCards;
         for (int i = 0; i < cardsNeeded; i++)
         {
             DrawNewCard();
         }
         
         cardsStarredThisTurn = 0; 
+
+        // --- NEW: TRIGGER GOLEM AI ---
+        if (enemyTarget != null)
+        {
+            enemyTarget.TakeTurn();
+        }
     }
 
     public void ReshuffleSelectedCardLetter()

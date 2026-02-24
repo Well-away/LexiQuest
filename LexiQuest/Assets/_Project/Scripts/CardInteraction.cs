@@ -37,6 +37,9 @@ public class CardInteraction : MonoBehaviour
     private float doubleClickThreshold = 0.3f; 
     private Coroutine tapCoroutine; 
 
+    [Header("Status Effects")]
+    public int lockedTurnsLeft = 0;
+
     void Start()
     {
         originalScale = transform.localScale;
@@ -142,6 +145,12 @@ public class CardInteraction : MonoBehaviour
 
     public void OnCardTapped()
     {
+        if (lockedTurnsLeft > 0)
+        {
+            Debug.LogWarning("This card is locked for " + lockedTurnsLeft + " more turns!");
+            return; 
+        }
+        
         if (cardState == 0)
         {
             if (Time.time - lastClickTime < doubleClickThreshold)
@@ -269,5 +278,28 @@ public class CardInteraction : MonoBehaviour
     {
         currentLetter = newLetter;
         if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
+    }
+
+    public void LockCard(int turns)
+    {
+        lockedTurnsLeft = turns;
+        
+        // Visually tint the card dark gray
+        UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
+        if (cardImage != null) cardImage.color = new Color(0.4f, 0.4f, 0.4f, 1f);
+    }
+
+    public void DecreaseLock()
+    {
+        if (lockedTurnsLeft > 0)
+        {
+            lockedTurnsLeft--;
+            if (lockedTurnsLeft == 0)
+            {
+                // Restore the card to its bright white color
+                UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
+                if (cardImage != null) cardImage.color = Color.white;
+            }
+        }
     }
 }
