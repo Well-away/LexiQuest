@@ -32,6 +32,7 @@ public class CardInteraction : MonoBehaviour
     [Header("Star System")]
     public bool isStarred = false;
     public GameObject starVisualActive; 
+    public GameObject starButtonObject;
 
     private float lastClickTime = -10f;
     private float doubleClickThreshold = 0.3f; 
@@ -291,6 +292,21 @@ public class CardInteraction : MonoBehaviour
         // Visually tint the card dark gray
         UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
         if (cardImage != null) cardImage.color = new Color(0.4f, 0.4f, 0.4f, 1f);
+
+        // --- NEW: Disable the Star Feature ---
+        // 1. If it was already starred before getting locked, un-star it and refund the Ink!
+        if (isStarred && WordManager.instance != null)
+        {
+            isStarred = false;
+            if (starVisualActive != null) starVisualActive.SetActive(false);
+            
+            WordManager.instance.currentInk += 1; 
+            WordManager.instance.cardsStarredThisTurn -= 1; 
+            WordManager.instance.UpdateInkUI();
+        }
+
+        // 2. Hide the Star button entirely so it cannot be seen or clicked
+        if (starButtonObject != null) starButtonObject.SetActive(false);
     }
 
     public void DecreaseLock()
@@ -303,6 +319,9 @@ public class CardInteraction : MonoBehaviour
                 // Restore the card to its bright white color
                 UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
                 if (cardImage != null) cardImage.color = Color.white;
+
+                // --- NEW: Bring the Star Button back! ---
+                if (starButtonObject != null) starButtonObject.SetActive(true);
             }
         }
     }

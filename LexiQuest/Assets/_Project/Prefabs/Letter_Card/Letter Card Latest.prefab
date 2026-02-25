@@ -233,6 +233,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 6737724714081405561}
     - target: {fileID: -252196952760865602, guid: e409325995e2b55498a037d32f8042e5, type: 3}
+      propertyPath: starButtonObject
+      value: 
+      objectReference: {fileID: 4846925812506815300}
+    - target: {fileID: -252196952760865602, guid: e409325995e2b55498a037d32f8042e5, type: 3}
       propertyPath: starVisualActive
       value: 
       objectReference: {fileID: 7590334579248024668}
