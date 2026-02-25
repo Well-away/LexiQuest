@@ -15,8 +15,8 @@ public class Enemy : MonoBehaviour
     public int groundSlamCooldown = 0;
     public int hardenedSkinCooldown = 0;
     public int crashingFistCooldown = 10; 
-    public int boulderThrowCooldown = 3; // NEW!
-    public int bindingCooldown = 5;      // NEW!
+    public int boulderThrowCooldown = 3; 
+    public int bindingCooldown = 5;      
 
     private int hardenedSkinTurnsLeft = 0;
     public int currentWave = 1;
@@ -64,7 +64,6 @@ public class Enemy : MonoBehaviour
         currentHealth = maxHealth;
         healthBar.SetMaxHealth(maxHealth);
 
-        // --- RESET ALL COOLDOWNS ---
         groundSlamCooldown = 0;
         hardenedSkinCooldown = 0;
         crashingFistCooldown = 10;
@@ -83,7 +82,6 @@ public class Enemy : MonoBehaviour
 
     public void TakeTurn()
     {
-        // Tick down timers
         if (hardenedSkinTurnsLeft > 0) hardenedSkinTurnsLeft--;
         if (groundSlamCooldown > 0) groundSlamCooldown--;
         if (hardenedSkinCooldown > 0) hardenedSkinCooldown--;
@@ -91,13 +89,34 @@ public class Enemy : MonoBehaviour
         if (boulderThrowCooldown > 0) boulderThrowCooldown--;
         if (bindingCooldown > 0) bindingCooldown--;
 
-        // Action Priority
-        if (crashingFistCooldown == 0) CastCrashingFist();
-        else if (hardenedSkinCooldown == 0 && currentHealth <= maxHealth * 0.75f) CastHardenedSkin();
-        else if (bindingCooldown == 0) CastBinding();
-        else if (groundSlamCooldown == 0) CastGroundSlam();
-        else if (boulderThrowCooldown == 0) CastBoulderThrow();
-        else BasicAttack();
+        float hpPercent = (float)currentHealth / maxHealth;
+
+        // --- NEW: PHASE-BASED AI PRIORITY ---
+        if (hpPercent < 0.10f && crashingFistCooldown == 0)
+        {
+            CastCrashingFist(); // Phase 4: Under 10%
+        }
+        else if (hpPercent < 0.45f && bindingCooldown == 0)
+        {
+            CastBinding();      // Phase 3: Under 45%
+        }
+        else if (hpPercent < 0.70f && groundSlamCooldown == 0)
+        {
+            CastGroundSlam();   // Phase 2: Under 70%
+        }
+        // Phase 1: 70% or above (or if ultimate/special skills are on cooldown)
+        else if (hardenedSkinCooldown == 0)
+        {
+            CastHardenedSkin();
+        }
+        else if (boulderThrowCooldown == 0)
+        {
+            CastBoulderThrow();
+        }
+        else
+        {
+            BasicAttack();
+        }
     }
 
     private void BasicAttack()
@@ -111,7 +130,6 @@ public class Enemy : MonoBehaviour
     private void CastBoulderThrow()
     {
         boulderThrowCooldown = 4;
-        // Deals 10 + 10% of Target's Max HP
         int damage = 10 + Mathf.RoundToInt(playerTarget.maxHealth * 0.10f);
         Debug.Log($"<color=red>Monster uses Boulder Throw!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
@@ -120,20 +138,35 @@ public class Enemy : MonoBehaviour
     private void CastBinding()
     {
         bindingCooldown = 6;
-        int damage = 20;
-        Debug.Log($"<color=magenta>Monster uses BINDING!</color> Deals {damage} damage and STUNS you!");
+        int lostHP = maxHealth - currentHealth;
+        
+        // PATCH: 25% of Golem's LOST HP
+        int damage = Mathf.RoundToInt(lostHP * 0.25f);
+        int dotDamage = Mathf.RoundToInt(playerTarget.maxHealth * 0.05f);
+        
+        Debug.Log($"<color=magenta>Monster uses BINDING!</color> Deals {damage} damage, drains 5 Ink, and applies a {dotDamage} DoT for 2 turns!");
         playerTarget.TakeDamage(damage);
 
+        // PATCH: Drain 5 Ink
+        if (wordManager != null)
+        {
+            wordManager.currentInk -= 5;
+            if (wordManager.currentInk < 0) wordManager.currentInk = 0;
+            wordManager.UpdateInkUI();
+        }
+
+        // PATCH: Apply 2-Turn DoT (No longer stuns)
         if (playerTarget != null)
         {
-            playerTarget.ApplyBindingStun();
+            playerTarget.ApplyBindingDoT(2, dotDamage);
         }
     }
 
     private void CastGroundSlam()
     {
         groundSlamCooldown = 6;
-        int damage = Mathf.RoundToInt(playerTarget.maxHealth * 0.10f);
+        // PATCH: 25% of Amy's CURRENT HP
+        int damage = Mathf.RoundToInt(playerTarget.currentHealth * 0.25f);
         Debug.Log($"<color=red>Monster uses Ground Slam!</color> Deals {damage} damage and locks 2 cards.");
         playerTarget.TakeDamage(damage);
 
@@ -169,8 +202,19 @@ public class Enemy : MonoBehaviour
     private void CastCrashingFist()
     {
         crashingFistCooldown = 10;
-        int damage = Mathf.RoundToInt(playerTarget.maxHealth * 0.15f);
+        
+        // PATCH: Damage is 50% of Golem's LOST HP
+        int lostHP = maxHealth - currentHealth;
+        int damage = Mathf.RoundToInt(lostHP * 0.50f);
+        
         Debug.Log($"<color=magenta>Monster uses CRASHING FIST (Ultimate)!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
+
+        // PATCH: Heals for 50% of the damage dealt
+        int healAmount = Mathf.RoundToInt(damage * 0.50f);
+        currentHealth += healAmount;
+        if (currentHealth > maxHealth) currentHealth = maxHealth; // Prevent over-healing
+        healthBar.SetHealth(currentHealth);
+        Debug.Log($"<color=green>Monster heals for {healAmount} HP from Crashing Fist!</color>");
     }
 }

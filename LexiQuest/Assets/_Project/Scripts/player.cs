@@ -8,9 +8,9 @@ public class player : MonoBehaviour
 
     public HealthBar healthBar;
 
-    // --- NEW: Status Effects ---
-    public bool isStunned = false;
-    public bool hasBindingDoT = false;
+    // --- UPDATED: Status Effects ---
+    public int bindingDoTTurnsLeft = 0;
+    public int bindingDoTDamage = 0;
 
     void Start()
     {
@@ -55,29 +55,20 @@ public class player : MonoBehaviour
         Debug.Log("Player gained " + shieldAmount + " Armor! Total Armor: " + currentShield);
     }
 
-    // --- NEW: Status Effect Methods ---
-    public void ApplyBindingStun()
+    // --- UPDATED: New DoT Logic ---
+    public void ApplyBindingDoT(int turns, int damagePerTurn)
     {
-        isStunned = true;
-        hasBindingDoT = true;
+        bindingDoTTurnsLeft = turns;
+        bindingDoTDamage = damagePerTurn;
     }
 
     public void HandleStartOfTurn()
     {
-        if (hasBindingDoT)
+        if (bindingDoTTurnsLeft > 0)
         {
-            Debug.Log("<color=purple>Binding effect triggers! Player takes 10 damage.</color>");
-            TakeDamage(10);
-            hasBindingDoT = false; // Removes the DoT so it only hits once
-        }
-    }
-
-    public void ClearStun()
-    {
-        if (isStunned)
-        {
-            isStunned = false;
-            Debug.Log("<color=green>Stun has worn off. You can cast spells again.</color>");
+            Debug.Log($"<color=purple>Binding effect triggers! Player takes {bindingDoTDamage} damage from DoT.</color>");
+            TakeDamage(bindingDoTDamage);
+            bindingDoTTurnsLeft--;
         }
     }
 }

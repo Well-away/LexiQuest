@@ -109,11 +109,11 @@ public class WordManager : MonoBehaviour
     {
         if (CardInteraction.currentlyPlayedCard != null)
         {
-            if (playerTarget != null && playerTarget.isStunned)
-            {
-                Debug.LogWarning("You are STUNNED by Binding! You cannot cast spells. You must click End Turn.");
-                return; 
-            }
+            // if (playerTarget != null && playerTarget.isStunned)
+            // {
+            //     Debug.LogWarning("You are STUNNED by Binding! You cannot cast spells. You must click End Turn.");
+            //     return; 
+            // }
 
             string submittedWord = wordInputField.text;
 
@@ -274,10 +274,10 @@ public class WordManager : MonoBehaviour
 
         StopTimer(); // Pause it while the turn transition happens
 
-        if (playerTarget != null)
-        {
-            playerTarget.ClearStun();
-        }
+        // if (playerTarget != null)
+        // {
+        //     playerTarget.ClearStun();
+        // }
 
         if (CardInteraction.currentlyPlayedCard != null)
         {
