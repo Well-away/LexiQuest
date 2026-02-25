@@ -838,6 +838,7 @@ MonoBehaviour:
   cardPrefab: {fileID: 2625638231514093201, guid: bc3021020a2abb74c8854710c768a76c, type: 3}
   handContainer: {fileID: 895149509}
   startingHandSize: 2
+  maxHandSize: 5
   maxInk: 15
   currentInk: 10
   totalInkTextUI: {fileID: 334961839}

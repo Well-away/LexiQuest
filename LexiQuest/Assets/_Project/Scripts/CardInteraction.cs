@@ -1,6 +1,5 @@
 using UnityEngine;
-using System.Collections; 
-using System.Collections.Generic; // NEW: Required for Lists and Dictionaries
+using System.Collections.Generic; 
 using DG.Tweening;
 using TMPro; 
 
@@ -29,15 +28,6 @@ public class CardInteraction : MonoBehaviour
     private Transform handContainer;
     private Canvas cardCanvas; 
 
-    [Header("Star System")]
-    public bool isStarred = false;
-    public GameObject starVisualActive; 
-    public GameObject starButtonObject;
-
-    private float lastClickTime = -10f;
-    private float doubleClickThreshold = 0.3f; 
-    private Coroutine tapCoroutine; 
-
     [Header("Status Effects")]
     public int lockedTurnsLeft = 0;
 
@@ -53,7 +43,6 @@ public class CardInteraction : MonoBehaviour
         currentLetter = assignedLetter;
         if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
 
-        // --- 1. Define Spell Categories ---
         List<string> offensiveSpells = new List<string> { "Fireball", "Ice Shards", "Wind Blades" };
         List<string> nonOffensiveSpells = new List<string> { "Bubble Shield", "Revitalize" };
         
@@ -61,7 +50,6 @@ public class CardInteraction : MonoBehaviour
         allAvailableSpells.AddRange(offensiveSpells);
         allAvailableSpells.AddRange(nonOffensiveSpells);
 
-        // --- 2. Enforce the 2-Duplicate Limit ---
         Dictionary<string, int> spellCounts = new Dictionary<string, int>();
         
         if (transform.parent != null) 
@@ -83,11 +71,10 @@ public class CardInteraction : MonoBehaviour
         {
             if (kvp.Value >= 2)
             {
-                allAvailableSpells.Remove(kvp.Key); // Strip it from the pool!
+                allAvailableSpells.Remove(kvp.Key); 
             }
         }
 
-        // Fallback just in case the math gets weird and all spells are maxed out
         if (allAvailableSpells.Count == 0) 
         {
             allAvailableSpells.AddRange(offensiveSpells);
@@ -97,51 +84,16 @@ public class CardInteraction : MonoBehaviour
         currentSpell = allAvailableSpells[Random.Range(0, allAvailableSpells.Count)];
         if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
 
-        // --- 3. Enforce Ink Costs ---
         if (offensiveSpells.Contains(currentSpell))
         {
-            inkCost = Random.Range(2, 5); // 2, 3, or 4
+            inkCost = Random.Range(2, 5); 
         }
         else
         {
-            inkCost = Random.Range(1, 4); // 1, 2, or 3
+            inkCost = Random.Range(1, 4); 
         }
 
         if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
-    }
-
-    public void ToggleStar()
-    {
-        if (cardState == 2) return; 
-        if (WordManager.instance == null) return;
-
-        if (isStarred)
-        {
-            isStarred = false;
-            if (starVisualActive != null) starVisualActive.SetActive(false);
-            
-            WordManager.instance.currentInk += 1; 
-            WordManager.instance.cardsStarredThisTurn -= 1; 
-            WordManager.instance.UpdateInkUI();
-        }
-        else
-        {
-            if (WordManager.instance.currentInk >= 1 && WordManager.instance.cardsStarredThisTurn < 2)
-            {
-                isStarred = true;
-                if (starVisualActive != null) starVisualActive.SetActive(true);
-                
-                WordManager.instance.currentInk -= 1; 
-                WordManager.instance.cardsStarredThisTurn += 1; 
-                WordManager.instance.UpdateInkUI();
-            }
-        }
-    }
-
-    public void RemoveStar()
-    {
-        isStarred = false;
-        if (starVisualActive != null) starVisualActive.SetActive(false);
     }
 
     public void OnCardTapped()
@@ -152,34 +104,7 @@ public class CardInteraction : MonoBehaviour
             return; 
         }
         
-        if (cardState == 0)
-        {
-            if (Time.time - lastClickTime < doubleClickThreshold)
-            {
-                if (tapCoroutine != null)
-                {
-                    StopCoroutine(tapCoroutine);
-                    tapCoroutine = null;
-                }
-                
-                ToggleStar();
-                lastClickTime = -10f; 
-                return; 
-            }
-            
-            lastClickTime = Time.time; 
-            tapCoroutine = StartCoroutine(ProcessSingleTap());
-        }
-        else 
-        {
-            ExecuteSingleTapLogic();
-        }
-    }
-
-    private IEnumerator ProcessSingleTap()
-    {
-        yield return new WaitForSeconds(doubleClickThreshold);
-        tapCoroutine = null; 
+        // --- PATCH: No more Star double-tap delay! Executes instantly ---
         ExecuteSingleTapLogic();
     }
 
@@ -205,16 +130,6 @@ public class CardInteraction : MonoBehaviour
                 currentlyPlayedCard.ReturnToHand();
             }
 
-            if (isStarred)
-            {
-                isStarred = false;
-                if (starVisualActive != null) starVisualActive.SetActive(false);
-                
-                WordManager.instance.currentInk += 1; 
-                WordManager.instance.cardsStarredThisTurn -= 1; 
-                WordManager.instance.UpdateInkUI();
-            }
-
             originalIndex = transform.GetSiblingIndex(); 
             transform.SetParent(inputDisplayArea, false);
             transform.DOScale(originalScale * 1.5f, 0.2f); 
@@ -225,7 +140,7 @@ public class CardInteraction : MonoBehaviour
             currentlyZoomedCard = null; 
             currentlyPlayedCard = this;
 
-            WordManager.instance.StartTimer(); // <-- ADD THIS LINE HERE!
+            WordManager.instance.StartTimer(); 
 
             if (spellInputPanel != null)
             {
@@ -264,7 +179,7 @@ public class CardInteraction : MonoBehaviour
 
             cardState = 0;
             
-            WordManager.instance.StopTimer(); // <-- ADD THIS LINE HERE!
+            WordManager.instance.StopTimer(); 
             
             if (currentlyPlayedCard == this)
             {
@@ -289,24 +204,8 @@ public class CardInteraction : MonoBehaviour
     {
         lockedTurnsLeft = turns;
         
-        // Visually tint the card dark gray
         UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
         if (cardImage != null) cardImage.color = new Color(0.4f, 0.4f, 0.4f, 1f);
-
-        // --- NEW: Disable the Star Feature ---
-        // 1. If it was already starred before getting locked, un-star it and refund the Ink!
-        if (isStarred && WordManager.instance != null)
-        {
-            isStarred = false;
-            if (starVisualActive != null) starVisualActive.SetActive(false);
-            
-            WordManager.instance.currentInk += 1; 
-            WordManager.instance.cardsStarredThisTurn -= 1; 
-            WordManager.instance.UpdateInkUI();
-        }
-
-        // 2. Hide the Star button entirely so it cannot be seen or clicked
-        if (starButtonObject != null) starButtonObject.SetActive(false);
     }
 
     public void DecreaseLock()
@@ -316,12 +215,8 @@ public class CardInteraction : MonoBehaviour
             lockedTurnsLeft--;
             if (lockedTurnsLeft == 0)
             {
-                // Restore the card to its bright white color
                 UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
                 if (cardImage != null) cardImage.color = Color.white;
-
-                // --- NEW: Bring the Star Button back! ---
-                if (starButtonObject != null) starButtonObject.SetActive(true);
             }
         }
     }

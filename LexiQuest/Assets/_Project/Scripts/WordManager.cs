@@ -22,6 +22,7 @@ public class WordManager : MonoBehaviour
     public GameObject cardPrefab; 
     public Transform handContainer; 
     public int startingHandSize = 2; 
+    public int maxHandSize = 5;
 
     [Header("Ink System")]
     public int maxInk = 15; 
@@ -260,7 +261,7 @@ public class WordManager : MonoBehaviour
     {
         Debug.Log("Player ended their turn!");
 
-        StopTimer(); // NEW: Always stop the timer if the turn ends!
+        StopTimer(); 
 
         if (playerTarget != null)
         {
@@ -282,17 +283,10 @@ public class WordManager : MonoBehaviour
                 if (card.lockedTurnsLeft > 0)
                 {
                     card.DecreaseLock();
-                    survivingCards++; 
                 }
-                else if (!card.isStarred)
-                {
-                    Destroy(child.gameObject); 
-                }
-                else
-                {
-                    card.RemoveStar(); 
-                    survivingCards++;
-                }
+                
+                // --- PATCH 3: ALL cards survive! No more random destruction. ---
+                survivingCards++; 
             }
         }
 
@@ -303,13 +297,28 @@ public class WordManager : MonoBehaviour
         if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
         
-        int cardsNeeded = startingHandSize - survivingCards;
-        for (int i = 0; i < cardsNeeded; i++)
+        // --- PATCH 2: Card Regen Math ---
+        int cardsToDraw = 0;
+        
+        if (survivingCards <= 1) 
+        {
+            cardsToDraw = 2; // Refill 2 if empty or holding 1
+        }
+        else 
+        {
+            cardsToDraw = 1; // Refill 1 if holding 2 or more
+        }
+
+        // --- PATCH 1: Enforce Max Hand Size ---
+        if (survivingCards + cardsToDraw > maxHandSize)
+        {
+            cardsToDraw = maxHandSize - survivingCards;
+        }
+
+        for (int i = 0; i < cardsToDraw; i++)
         {
             DrawNewCard();
         }
-        
-        cardsStarredThisTurn = 0; 
 
         if (enemyTarget != null)
         {
