@@ -19,7 +19,7 @@ public class WordManager : MonoBehaviour
     [Header("Card Spawning")]
     public GameObject cardPrefab; 
     public Transform handContainer; 
-    public int startingHandSize = 5; 
+    public int startingHandSize = 2; 
 
     [Header("Ink System")]
     public int maxInk = 15; 
@@ -35,7 +35,7 @@ public class WordManager : MonoBehaviour
     void Start()
     {
         if (spellInputPanel != null) spellInputPanel.SetActive(false);
-        currentInk = 5; 
+        currentInk = 4; 
         UpdateInkUI();
 
         for (int i = 0; i < startingHandSize; i++)
@@ -223,9 +223,19 @@ public class WordManager : MonoBehaviour
         }
 
         // Ink Math
-        if (currentInk == 0) currentInk += 7; 
-        else if (currentInk >= 10) currentInk += 3;
-        else currentInk += 5; 
+        // --- PATCH 3: New Ink Regeneration Scaling ---
+        if (currentInk == 0) 
+        {
+            currentInk += 5; // Empty ink jar gives 5
+        }
+        else if (currentInk >= 8) 
+        {
+            currentInk += 3; // 8 or more gives 3
+        }
+        else 
+        {
+            currentInk += 4; // 1 to 7 gives 4
+        }
 
         if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
