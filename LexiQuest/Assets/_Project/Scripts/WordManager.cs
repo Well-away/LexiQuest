@@ -48,12 +48,18 @@ public class WordManager : MonoBehaviour
     {
         if (CardInteraction.currentlyPlayedCard != null)
         {
+            if (playerTarget != null && playerTarget.isStunned)
+            {
+                Debug.LogWarning("You are STUNNED by Binding! You cannot cast spells. You must click End Turn.");
+                return; 
+            }
+
             string submittedWord = wordInputField.text;
 
-            // --- UPDATED: Reject words with 3 or fewer letters ---
-            if (submittedWord.Length <= 3)
+            // --- PATCH 1: Reject words with 2 or fewer letters ---
+            if (submittedWord.Length <= 2)
             {
-                Debug.LogWarning("Word is too short! Spells require at least 4 letters.");
+                Debug.LogWarning("Word is too short! Spells require at least 3 letters.");
                 return; 
             }
 
@@ -67,22 +73,27 @@ public class WordManager : MonoBehaviour
             // --- COMBAT MATH ---
             string spellName = CardInteraction.currentlyPlayedCard.currentSpell;
             int basePower = costOfSpell * 5; 
+            
+            // --- PATCH 4: Suffix Filter determines effective length ---
+            int effectiveLength = GetEffectiveWordLength(submittedWord);
+
             float multiplier = 1.0f;
 
-            // --- UPDATED: New Word Length Multipliers ---
-            if (submittedWord.Length == 4) multiplier = 1.0f;
-            else if (submittedWord.Length == 5) multiplier = 1.5f;
-            else if (submittedWord.Length == 6) multiplier = 2.0f;
-            else if (submittedWord.Length >= 7) multiplier = 2.5f;
+            // --- PATCH 2 & 3: New Scaling based on Effective Length ---
+            if (effectiveLength <= 4) multiplier = 0.5f;     // 3 and 4 letter words get 50% reduction!
+            else if (effectiveLength == 5) multiplier = 1.0f; // Scale begins at 5 letters
+            else if (effectiveLength == 6) multiplier = 1.5f;
+            else if (effectiveLength == 7) multiplier = 2.0f;
+            else if (effectiveLength >= 8) multiplier = 2.5f;
 
             int finalPower = Mathf.RoundToInt(basePower * multiplier);
 
-            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}'. Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>");
+            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}' (Effective Length: {effectiveLength}). Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>");
 
             // --- ROUTE THE SPELL ---
             if (spellName == "Fireball")
             {
-                finalPower += 5; // Fireball gets a flat +5 damage bonus!
+                finalPower += 5; 
                 if (enemyTarget != null) enemyTarget.TakeDamage(finalPower);
             }
             else if (spellName == "Ice Shards" || spellName == "Wind Blades")
@@ -172,6 +183,15 @@ public class WordManager : MonoBehaviour
 
     public void EndTurn()
     {
+        Debug.Log("Player ended their turn!");
+
+        // --- NEW: Clear the Stun because the player skipped their turn! ---
+        if (playerTarget != null)
+        {
+            playerTarget.ClearStun();
+        }
+        // ------------------------------------------------------------------
+
         if (CardInteraction.currentlyPlayedCard != null)
         {
             CardInteraction.currentlyPlayedCard.ReturnToHand();
@@ -219,10 +239,15 @@ public class WordManager : MonoBehaviour
         
         cardsStarredThisTurn = 0; 
 
-        // --- NEW: TRIGGER GOLEM AI ---
+        // --- ENEMY AI & PLAYER TURN START ---
         if (enemyTarget != null)
         {
-            enemyTarget.TakeTurn();
+            enemyTarget.TakeTurn(); // Enemy acts
+        }
+
+        if (playerTarget != null)
+        {
+            playerTarget.HandleStartOfTurn(); // Checks for DoT damage!
         }
     }
 
@@ -268,6 +293,21 @@ public class WordManager : MonoBehaviour
         }
     }
 
+// --- NEW: Suffix Filter Logic ---
+    private int GetEffectiveWordLength(string word)
+    {
+        string w = word.ToLower();
+        int len = w.Length;
+
+        // Strips common suffixes ONLY if the remaining root word is at least 3 letters long.
+        // This prevents breaking base words like "sing", "bed", "yes", or "pass".
+        if (w.EndsWith("ing") && len >= 6) return len - 3; 
+        if (w.EndsWith("ed") && len >= 5) return len - 2;  
+        if (w.EndsWith("es") && len >= 5) return len - 2;  
+        if (w.EndsWith("s") && len >= 4 && !w.EndsWith("ss")) return len - 1; 
+
+        return len; // Returns the normal length if no suffixes are detected
+    }
     // --- NEW: Background Click Unzoom Logic ---
     public void UnzoomBackgroundClick()
     {

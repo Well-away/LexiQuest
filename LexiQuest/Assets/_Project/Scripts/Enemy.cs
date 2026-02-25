@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine.UI; // NEW: Allows us to tint the monster's color!
 
 public class Enemy : MonoBehaviour
 {
@@ -16,10 +15,10 @@ public class Enemy : MonoBehaviour
     public int groundSlamCooldown = 0;
     public int hardenedSkinCooldown = 0;
     public int crashingFistCooldown = 10; 
+    public int boulderThrowCooldown = 3; // NEW!
+    public int bindingCooldown = 5;      // NEW!
 
     private int hardenedSkinTurnsLeft = 0;
-
-    [Header("Roguelike Progression")]
     public int currentWave = 1;
 
     void Start()
@@ -30,7 +29,6 @@ public class Enemy : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
-        // 1. Hardened Skin Passive Check 
         if (hardenedSkinTurnsLeft > 0)
         {
             damage = Mathf.RoundToInt(damage * 0.5f); 
@@ -39,12 +37,11 @@ public class Enemy : MonoBehaviour
 
         currentHealth -= damage;
         
-        // 2. Check for Death!
         if (currentHealth <= 0) 
         {
             currentHealth = 0;
             healthBar.SetHealth(currentHealth);
-            SummonNextMonster(); // Trigger the Roguelike loop!
+            SummonNextMonster(); 
         }
         else
         {
@@ -56,32 +53,28 @@ public class Enemy : MonoBehaviour
     {
         Debug.Log($"<color=yellow>Monster Defeated! You cleared Wave {currentWave}!</color>");
 
-        // --- ROGUELIKE REWARD ---
-        // Heal Amy for 30% of her max HP so she can survive the endless gauntlet
         if (playerTarget != null)
         {
             int healReward = Mathf.RoundToInt(playerTarget.maxHealth * 0.30f);
             playerTarget.Heal(healReward);
         }
 
-        // --- SCALE DIFFICULTY ---
         currentWave++;
-        maxHealth = Mathf.RoundToInt(maxHealth * 1.30f); // HP increases by 30% every wave!
+        maxHealth = Mathf.RoundToInt(maxHealth * 1.30f); 
         currentHealth = maxHealth;
         healthBar.SetMaxHealth(maxHealth);
 
-        // --- RESET AI ---
+        // --- RESET ALL COOLDOWNS ---
         groundSlamCooldown = 0;
         hardenedSkinCooldown = 0;
         crashingFistCooldown = 10;
         hardenedSkinTurnsLeft = 0;
+        boulderThrowCooldown = 3; 
+        bindingCooldown = 5;      
 
-        // --- VISUAL JUICE (3D Version) ---
-        // Grab the 3D Renderer instead of a UI Image
         Renderer enemyRenderer = GetComponent<Renderer>();
         if (enemyRenderer != null)
         {
-            // Changes the color of the cube's material
             enemyRenderer.material.color = new Color(Random.value, Random.value, Random.value, 1f);
         }
 
@@ -90,27 +83,21 @@ public class Enemy : MonoBehaviour
 
     public void TakeTurn()
     {
+        // Tick down timers
         if (hardenedSkinTurnsLeft > 0) hardenedSkinTurnsLeft--;
         if (groundSlamCooldown > 0) groundSlamCooldown--;
         if (hardenedSkinCooldown > 0) hardenedSkinCooldown--;
         if (crashingFistCooldown > 0) crashingFistCooldown--;
+        if (boulderThrowCooldown > 0) boulderThrowCooldown--;
+        if (bindingCooldown > 0) bindingCooldown--;
 
-        if (crashingFistCooldown == 0)
-        {
-            CastCrashingFist();
-        }
-        else if (hardenedSkinCooldown == 0 && currentHealth <= maxHealth * 0.75f) 
-        {
-            CastHardenedSkin();
-        }
-        else if (groundSlamCooldown == 0)
-        {
-            CastGroundSlam();
-        }
-        else
-        {
-            BasicAttack();
-        }
+        // Action Priority
+        if (crashingFistCooldown == 0) CastCrashingFist();
+        else if (hardenedSkinCooldown == 0 && currentHealth <= maxHealth * 0.75f) CastHardenedSkin();
+        else if (bindingCooldown == 0) CastBinding();
+        else if (groundSlamCooldown == 0) CastGroundSlam();
+        else if (boulderThrowCooldown == 0) CastBoulderThrow();
+        else BasicAttack();
     }
 
     private void BasicAttack()
@@ -119,6 +106,28 @@ public class Enemy : MonoBehaviour
         if (damage < 1) damage = 1; 
         Debug.Log($"<color=orange>Monster uses Basic Attack!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
+    }
+
+    private void CastBoulderThrow()
+    {
+        boulderThrowCooldown = 4;
+        // Deals 10 + 10% of Target's Max HP
+        int damage = 10 + Mathf.RoundToInt(playerTarget.maxHealth * 0.10f);
+        Debug.Log($"<color=red>Monster uses Boulder Throw!</color> Deals {damage} damage.");
+        playerTarget.TakeDamage(damage);
+    }
+
+    private void CastBinding()
+    {
+        bindingCooldown = 6;
+        int damage = 20;
+        Debug.Log($"<color=magenta>Monster uses BINDING!</color> Deals {damage} damage and STUNS you!");
+        playerTarget.TakeDamage(damage);
+
+        if (playerTarget != null)
+        {
+            playerTarget.ApplyBindingStun();
+        }
     }
 
     private void CastGroundSlam()
