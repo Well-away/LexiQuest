@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
+using System.Linq; // NEW: Required for Queue.Contains()
 using UnityEngine.UI; // NEW: Required for the Slider!
 
 public class WordManager : MonoBehaviour
@@ -34,9 +35,15 @@ public class WordManager : MonoBehaviour
 
     [Header("Timer System")]
     public Slider timerSlider; 
-    public float maxTurnTime = 40f; 
+    public float maxTurnTime = 25f; // PATCH: Reduced to 25 seconds
     private float currentTimer; 
     private bool isTimerRunning = false;
+
+    // --- NEW: Grimoire History Tracking ---
+    [Header("Grimoire System")]
+    public int grimoireCooldown = 5; 
+    private Queue<string> recentWords = new Queue<string>(); 
+    // --------------------------------------
 
     void Start()
     {
@@ -133,9 +140,32 @@ public class WordManager : MonoBehaviour
             else if (effectiveLength == 7) multiplier = 2.0f;
             else if (effectiveLength >= 8) multiplier = 2.5f;
 
+            // --- NEW: GRIMOIRE SPAM PENALTY ---
+            string normalizedWord = submittedWord.ToLower();
+            bool isSpam = recentWords.Contains(normalizedWord);
+
+            if (isSpam)
+            {
+                multiplier *= 0.5f; // Cuts the final multiplier in half!
+                Debug.LogWarning($"<color=orange>GRIMOIRE PENALTY!</color> '{submittedWord}' is on cooldown! Damage reduced by 50%.");
+            }
+            // ----------------------------------
+
             int finalPower = Mathf.RoundToInt(basePower * multiplier);
 
             Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}' (Effective Length: {effectiveLength}). Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>");
+
+            // --- NEW: UPDATE GRIMOIRE HISTORY ---
+            // Only add the word to the history if it isn't already sitting in the queue
+            if (!isSpam) 
+            {
+                recentWords.Enqueue(normalizedWord);
+                if (recentWords.Count > grimoireCooldown)
+                {
+                    recentWords.Dequeue(); // Removes the oldest word once we hit 5!
+                }
+            }
+            // ------------------------------------
 
             if (spellName == "Fireball")
             {
