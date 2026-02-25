@@ -224,6 +224,8 @@ public class CardInteraction : MonoBehaviour
             currentlyZoomedCard = null; 
             currentlyPlayedCard = this;
 
+            WordManager.instance.StartTimer(); // <-- ADD THIS LINE HERE!
+
             if (spellInputPanel != null)
             {
                 spellInputPanel.SetActive(true);
@@ -260,6 +262,8 @@ public class CardInteraction : MonoBehaviour
             transform.DOScale(originalScale, 0.2f);
 
             cardState = 0;
+            
+            WordManager.instance.StopTimer(); // <-- ADD THIS LINE HERE!
             
             if (currentlyPlayedCard == this)
             {

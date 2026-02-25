@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
+using UnityEngine.UI; // NEW: Required for the Slider!
 
 public class WordManager : MonoBehaviour
 {
@@ -25,16 +26,23 @@ public class WordManager : MonoBehaviour
     public int maxInk = 15; 
     public int currentInk; 
     public TextMeshProUGUI totalInkTextUI;
-
     public int cardsStarredThisTurn = 0;
     
     [Header("Battle Targets")]
     public player playerTarget; 
     public Enemy enemyTarget;
 
+    [Header("Timer System")]
+    public Slider timerSlider; 
+    public float maxTurnTime = 40f; 
+    private float currentTimer; 
+    private bool isTimerRunning = false;
+
     void Start()
     {
         if (spellInputPanel != null) spellInputPanel.SetActive(false);
+        if (timerSlider != null) timerSlider.gameObject.SetActive(false); // Hide timer at start
+        
         currentInk = 4; 
         UpdateInkUI();
 
@@ -43,6 +51,50 @@ public class WordManager : MonoBehaviour
             DrawNewCard();
         }
     }
+
+    // --- NEW: The Timer Countdown Logic ---
+    void Update()
+    {
+        if (isTimerRunning)
+        {
+            currentTimer -= Time.deltaTime; // Smoothly subtracts time every frame
+            
+            if (timerSlider != null) 
+            {
+                timerSlider.value = currentTimer;
+            }
+
+            if (currentTimer <= 0)
+            {
+                Debug.LogWarning("<color=red>Time's up!</color> Turn automatically ended.");
+                StopTimer();
+                EndTurn(); // Force the turn to end if time runs out!
+            }
+        }
+    }
+
+    public void StartTimer()
+    {
+        currentTimer = maxTurnTime;
+        isTimerRunning = true;
+        
+        if (timerSlider != null) 
+        {
+            timerSlider.maxValue = maxTurnTime;
+            timerSlider.value = currentTimer;
+            timerSlider.gameObject.SetActive(true); // Reveal the sliding bar
+        }
+    }
+
+    public void StopTimer()
+    {
+        isTimerRunning = false;
+        if (timerSlider != null) 
+        {
+            timerSlider.gameObject.SetActive(false); // Hide the bar when not spelling
+        }
+    }
+    // --------------------------------------
 
     public void SubmitWord()
     {
@@ -56,7 +108,6 @@ public class WordManager : MonoBehaviour
 
             string submittedWord = wordInputField.text;
 
-            // --- PATCH 1: Reject words with 2 or fewer letters ---
             if (submittedWord.Length <= 2)
             {
                 Debug.LogWarning("Word is too short! Spells require at least 3 letters.");
@@ -70,18 +121,14 @@ public class WordManager : MonoBehaviour
                 return; 
             }
 
-            // --- COMBAT MATH ---
             string spellName = CardInteraction.currentlyPlayedCard.currentSpell;
             int basePower = costOfSpell * 5; 
             
-            // --- PATCH 4: Suffix Filter determines effective length ---
             int effectiveLength = GetEffectiveWordLength(submittedWord);
-
             float multiplier = 1.0f;
 
-            // --- PATCH 2 & 3: New Scaling based on Effective Length ---
-            if (effectiveLength <= 4) multiplier = 0.5f;     // 3 and 4 letter words get 50% reduction!
-            else if (effectiveLength == 5) multiplier = 1.0f; // Scale begins at 5 letters
+            if (effectiveLength <= 4) multiplier = 0.5f;     
+            else if (effectiveLength == 5) multiplier = 1.0f; 
             else if (effectiveLength == 6) multiplier = 1.5f;
             else if (effectiveLength == 7) multiplier = 2.0f;
             else if (effectiveLength >= 8) multiplier = 2.5f;
@@ -90,7 +137,6 @@ public class WordManager : MonoBehaviour
 
             Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}' (Effective Length: {effectiveLength}). Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>");
 
-            // --- ROUTE THE SPELL ---
             if (spellName == "Fireball")
             {
                 finalPower += 5; 
@@ -108,13 +154,12 @@ public class WordManager : MonoBehaviour
             {
                 if (playerTarget != null) playerTarget.AddShield(finalPower);
             }
-            // ------------------------
 
-            // Pay the Ink Cost
             currentInk -= costOfSpell;
             UpdateInkUI();
 
-            // Cleanup the Board
+            StopTimer(); // NEW: Turn off the timer when a spell is successfully cast!
+
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
@@ -185,12 +230,12 @@ public class WordManager : MonoBehaviour
     {
         Debug.Log("Player ended their turn!");
 
-        // --- NEW: Clear the Stun because the player skipped their turn! ---
+        StopTimer(); // NEW: Always stop the timer if the turn ends!
+
         if (playerTarget != null)
         {
             playerTarget.ClearStun();
         }
-        // ------------------------------------------------------------------
 
         if (CardInteraction.currentlyPlayedCard != null)
         {
@@ -204,11 +249,10 @@ public class WordManager : MonoBehaviour
             CardInteraction card = child.GetComponent<CardInteraction>();
             if (card != null)
             {
-                // --- UPDATED: Handle Locked Cards ---
                 if (card.lockedTurnsLeft > 0)
                 {
                     card.DecreaseLock();
-                    survivingCards++; // It takes up a slot in your hand!
+                    survivingCards++; 
                 }
                 else if (!card.isStarred)
                 {
@@ -222,25 +266,13 @@ public class WordManager : MonoBehaviour
             }
         }
 
-        // Ink Math
-        // --- PATCH 3: New Ink Regeneration Scaling ---
-        if (currentInk == 0) 
-        {
-            currentInk += 5; // Empty ink jar gives 5
-        }
-        else if (currentInk >= 8) 
-        {
-            currentInk += 3; // 8 or more gives 3
-        }
-        else 
-        {
-            currentInk += 4; // 1 to 7 gives 4
-        }
+        if (currentInk == 0) currentInk += 5; 
+        else if (currentInk >= 8) currentInk += 3;
+        else currentInk += 4; 
 
         if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
         
-        // Draw replacing cards
         int cardsNeeded = startingHandSize - survivingCards;
         for (int i = 0; i < cardsNeeded; i++)
         {
@@ -249,15 +281,14 @@ public class WordManager : MonoBehaviour
         
         cardsStarredThisTurn = 0; 
 
-        // --- ENEMY AI & PLAYER TURN START ---
         if (enemyTarget != null)
         {
-            enemyTarget.TakeTurn(); // Enemy acts
+            enemyTarget.TakeTurn(); 
         }
 
         if (playerTarget != null)
         {
-            playerTarget.HandleStartOfTurn(); // Checks for DoT damage!
+            playerTarget.HandleStartOfTurn(); 
         }
     }
 
@@ -295,6 +326,8 @@ public class WordManager : MonoBehaviour
 
                 wordInputField.text = newLetter.ToString();
                 wordInputField.MoveTextEnd(false); 
+
+                StartTimer(); // NEW: Rerolling perfectly resets the 40 seconds!
             }
             else
             {
@@ -303,22 +336,6 @@ public class WordManager : MonoBehaviour
         }
     }
 
-// --- NEW: Suffix Filter Logic ---
-    private int GetEffectiveWordLength(string word)
-    {
-        string w = word.ToLower();
-        int len = w.Length;
-
-        // Strips common suffixes ONLY if the remaining root word is at least 3 letters long.
-        // This prevents breaking base words like "sing", "bed", "yes", or "pass".
-        if (w.EndsWith("ing") && len >= 6) return len - 3; 
-        if (w.EndsWith("ed") && len >= 5) return len - 2;  
-        if (w.EndsWith("es") && len >= 5) return len - 2;  
-        if (w.EndsWith("s") && len >= 4 && !w.EndsWith("ss")) return len - 1; 
-
-        return len; // Returns the normal length if no suffixes are detected
-    }
-    // --- NEW: Background Click Unzoom Logic ---
     public void UnzoomBackgroundClick()
     {
         if (CardInteraction.currentlyZoomedCard != null)
@@ -326,5 +343,17 @@ public class WordManager : MonoBehaviour
             CardInteraction.currentlyZoomedCard.Unzoom();
         }
     }
-    // ------------------------------------------
+
+    private int GetEffectiveWordLength(string word)
+    {
+        string w = word.ToLower();
+        int len = w.Length;
+
+        if (w.EndsWith("ing") && len >= 6) return len - 3; 
+        if (w.EndsWith("ed") && len >= 5) return len - 2;  
+        if (w.EndsWith("es") && len >= 5) return len - 2;  
+        if (w.EndsWith("s") && len >= 4 && !w.EndsWith("ss")) return len - 1; 
+
+        return len; 
+    }
 }
