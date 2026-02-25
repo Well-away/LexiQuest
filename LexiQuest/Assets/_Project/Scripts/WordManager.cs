@@ -1,8 +1,8 @@
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
-using System.Linq; // NEW: Required for Queue.Contains()
-using UnityEngine.UI; // NEW: Required for the Slider!
+using System.Linq; 
+using UnityEngine.UI; 
 
 public class WordManager : MonoBehaviour
 {
@@ -22,13 +22,12 @@ public class WordManager : MonoBehaviour
     public GameObject cardPrefab; 
     public Transform handContainer; 
     public int startingHandSize = 2; 
-    public int maxHandSize = 5;
+    public int maxHandSize = 5; 
 
     [Header("Ink System")]
     public int maxInk = 15; 
     public int currentInk; 
     public TextMeshProUGUI totalInkTextUI;
-    public int cardsStarredThisTurn = 0;
     
     [Header("Battle Targets")]
     public player playerTarget; 
@@ -36,20 +35,21 @@ public class WordManager : MonoBehaviour
 
     [Header("Timer System")]
     public Slider timerSlider; 
-    public float maxTurnTime = 25f; // PATCH: Reduced to 25 seconds
+    public float maxTurnTime = 60f; // PATCH 1: 1-Minute Total Timer
     private float currentTimer; 
     private bool isTimerRunning = false;
 
-    // --- NEW: Grimoire History Tracking ---
     [Header("Grimoire System")]
     public int grimoireCooldown = 5; 
     private Queue<string> recentWords = new Queue<string>(); 
-    // --------------------------------------
+
+    [Header("Word Discovery System")]
+    private HashSet<string> discoveredWords = new HashSet<string>();
 
     void Start()
     {
         if (spellInputPanel != null) spellInputPanel.SetActive(false);
-        if (timerSlider != null) timerSlider.gameObject.SetActive(false); // Hide timer at start
+        if (timerSlider != null) timerSlider.gameObject.SetActive(false); 
         
         currentInk = 4; 
         UpdateInkUI();
@@ -58,14 +58,16 @@ public class WordManager : MonoBehaviour
         {
             DrawNewCard();
         }
+
+        // Start the global turn timer the moment the game begins!
+        StartTurnTimer();
     }
 
-    // --- NEW: The Timer Countdown Logic ---
     void Update()
     {
         if (isTimerRunning)
         {
-            currentTimer -= Time.deltaTime; // Smoothly subtracts time every frame
+            currentTimer -= Time.deltaTime; 
             
             if (timerSlider != null) 
             {
@@ -76,21 +78,21 @@ public class WordManager : MonoBehaviour
             {
                 Debug.LogWarning("<color=red>Time's up!</color> Turn automatically ended.");
                 StopTimer();
-                EndTurn(); // Force the turn to end if time runs out!
+                EndTurn(); 
             }
         }
     }
 
-    public void StartTimer()
+    public void StartTurnTimer()
     {
         currentTimer = maxTurnTime;
         isTimerRunning = true;
         
         if (timerSlider != null) 
         {
-            timerSlider.maxValue = maxTurnTime;
+            timerSlider.maxValue = maxTurnTime; 
             timerSlider.value = currentTimer;
-            timerSlider.gameObject.SetActive(true); // Reveal the sliding bar
+            timerSlider.gameObject.SetActive(true); 
         }
     }
 
@@ -99,10 +101,9 @@ public class WordManager : MonoBehaviour
         isTimerRunning = false;
         if (timerSlider != null) 
         {
-            timerSlider.gameObject.SetActive(false); // Hide the bar when not spelling
+            timerSlider.gameObject.SetActive(false); 
         }
     }
-    // --------------------------------------
 
     public void SubmitWord()
     {
@@ -135,38 +136,39 @@ public class WordManager : MonoBehaviour
             int effectiveLength = GetEffectiveWordLength(submittedWord);
             float multiplier = 1.0f;
 
-            if (effectiveLength <= 4) multiplier = 0.5f;     
-            else if (effectiveLength == 5) multiplier = 1.0f; 
-            else if (effectiveLength == 6) multiplier = 1.5f;
-            else if (effectiveLength == 7) multiplier = 2.0f;
-            else if (effectiveLength >= 8) multiplier = 2.5f;
+            if (effectiveLength <= 4) 
+            {
+                multiplier = 0.5f;     
+            }
+            else if (effectiveLength == 5) 
+            {
+                multiplier = 1.0f; 
+            }
+            else if (effectiveLength >= 6) 
+            {
+                multiplier = 1.0f + ((effectiveLength - 5) * 0.12f);
+            }
 
-            // --- NEW: GRIMOIRE SPAM PENALTY ---
             string normalizedWord = submittedWord.ToLower();
-            bool isSpam = recentWords.Contains(normalizedWord);
 
+            bool isNewDiscovery = !discoveredWords.Contains(normalizedWord);
+            if (isNewDiscovery)
+            {
+                multiplier *= 1.5f; 
+                discoveredWords.Add(normalizedWord);
+            }
+
+            bool isSpam = recentWords.Contains(normalizedWord);
             if (isSpam)
             {
-                multiplier *= 0.5f; // Cuts the final multiplier in half!
+                multiplier *= 0.5f; 
                 Debug.LogWarning($"<color=orange>GRIMOIRE PENALTY!</color> '{submittedWord}' is on cooldown! Damage reduced by 50%.");
             }
-            // ----------------------------------
 
             int finalPower = Mathf.RoundToInt(basePower * multiplier);
 
-            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}' (Effective Length: {effectiveLength}). Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>");
-
-            // --- NEW: UPDATE GRIMOIRE HISTORY ---
-            // Only add the word to the history if it isn't already sitting in the queue
-            if (!isSpam) 
-            {
-                recentWords.Enqueue(normalizedWord);
-                if (recentWords.Count > grimoireCooldown)
-                {
-                    recentWords.Dequeue(); // Removes the oldest word once we hit 5!
-                }
-            }
-            // ------------------------------------
+            string discoveryLog = isNewDiscovery ? " <color=yellow>[NEW DISCOVERY x1.5]</color>" : "";
+            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}' (Eff Length: {effectiveLength}). Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>{discoveryLog}");
 
             if (spellName == "Fireball")
             {
@@ -189,7 +191,16 @@ public class WordManager : MonoBehaviour
             currentInk -= costOfSpell;
             UpdateInkUI();
 
-            StopTimer(); // NEW: Turn off the timer when a spell is successfully cast!
+            if (!isSpam) 
+            {
+                recentWords.Enqueue(normalizedWord);
+                if (recentWords.Count > grimoireCooldown)
+                {
+                    recentWords.Dequeue(); 
+                }
+            }
+
+            // NOTE: We no longer stop the timer here! The turn keeps going!
 
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
@@ -261,7 +272,7 @@ public class WordManager : MonoBehaviour
     {
         Debug.Log("Player ended their turn!");
 
-        StopTimer(); 
+        StopTimer(); // Pause it while the turn transition happens
 
         if (playerTarget != null)
         {
@@ -284,8 +295,6 @@ public class WordManager : MonoBehaviour
                 {
                     card.DecreaseLock();
                 }
-                
-                // --- PATCH 3: ALL cards survive! No more random destruction. ---
                 survivingCards++; 
             }
         }
@@ -297,19 +306,11 @@ public class WordManager : MonoBehaviour
         if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
         
-        // --- PATCH 2: Card Regen Math ---
         int cardsToDraw = 0;
         
-        if (survivingCards <= 1) 
-        {
-            cardsToDraw = 2; // Refill 2 if empty or holding 1
-        }
-        else 
-        {
-            cardsToDraw = 1; // Refill 1 if holding 2 or more
-        }
+        if (survivingCards <= 1) cardsToDraw = 2; 
+        else cardsToDraw = 1; 
 
-        // --- PATCH 1: Enforce Max Hand Size ---
         if (survivingCards + cardsToDraw > maxHandSize)
         {
             cardsToDraw = maxHandSize - survivingCards;
@@ -329,9 +330,13 @@ public class WordManager : MonoBehaviour
         {
             playerTarget.HandleStartOfTurn(); 
         }
+
+        // Restart the fresh 60 seconds for the new turn!
+        StartTurnTimer();
     }
 
-    public void ReshuffleSelectedCardLetter()
+    // PATCH 2: Renamed to ShuffleLetter
+    public void ShuffleLetter()
     {
         if (CardInteraction.currentlyPlayedCard != null)
         {
@@ -366,11 +371,14 @@ public class WordManager : MonoBehaviour
                 wordInputField.text = newLetter.ToString();
                 wordInputField.MoveTextEnd(false); 
 
-                StartTimer(); // NEW: Rerolling perfectly resets the 40 seconds!
+                // --- PATCH 2: Deduct 5 seconds instead of resetting ---
+                currentTimer -= 5f; 
+                // We do not need to manually check if it drops below 0 here. 
+                // The Update() loop will catch it on the very next frame and force an EndTurn!
             }
             else
             {
-                Debug.LogWarning("Not enough Ink to reshuffle this letter!");
+                Debug.LogWarning("Not enough Ink to shuffle this letter!");
             }
         }
     }

@@ -140,7 +140,7 @@ public class CardInteraction : MonoBehaviour
             currentlyZoomedCard = null; 
             currentlyPlayedCard = this;
 
-            WordManager.instance.StartTimer(); 
+            // DELETED: WordManager.instance.StartTimer(); 
 
             if (spellInputPanel != null)
             {
@@ -179,7 +179,7 @@ public class CardInteraction : MonoBehaviour
 
             cardState = 0;
             
-            WordManager.instance.StopTimer(); 
+            // DELETED: WordManager.instance.StopTimer(); 
             
             if (currentlyPlayedCard == this)
             {
