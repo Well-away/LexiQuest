@@ -125,6 +125,10 @@ public class CardInteraction : MonoBehaviour
         }
         else if (cardState == 1)
         {
+            // 1. Notify the timer FIRST
+            WordManager.instance.NotifyCardClicked(); 
+
+            // 2. THEN do the normal card checks
             if (currentlyPlayedCard != null && currentlyPlayedCard != this)
             {
                 currentlyPlayedCard.ReturnToHand();
@@ -218,6 +222,19 @@ public class CardInteraction : MonoBehaviour
                 UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
                 if (cardImage != null) cardImage.color = Color.white;
             }
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (currentlyPlayedCard == this)
+        {
+            currentlyPlayedCard = null;
+        }
+        
+        if (currentlyZoomedCard == this)
+        {
+            currentlyZoomedCard = null;
         }
     }
 }

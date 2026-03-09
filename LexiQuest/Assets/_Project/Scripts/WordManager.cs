@@ -23,6 +23,8 @@ public class WordManager : MonoBehaviour
     public Transform handContainer; 
     public int startingHandSize = 2; 
     public int maxHandSize = 5; 
+    // PATCH: Excluded X, Q, V, Z from the pool!
+    private string allowedAlphabet = "ABCDEFGHIJKLMNOPRSTUWY"; 
 
     [Header("Ink System")]
     public int maxInk = 15; 
@@ -35,16 +37,21 @@ public class WordManager : MonoBehaviour
 
     [Header("Timer System")]
     public Slider timerSlider; 
-    public float maxTurnTime = 60f; // PATCH 1: 1-Minute Total Timer
+    public float maxTurnTime = 60f; 
     private float currentTimer; 
     private bool isTimerRunning = false;
+    private bool hasStartedTurnTimer = false; // PATCH: Planning Phase Tracker
 
     [Header("Grimoire System")]
     public int grimoireCooldown = 5; 
     private Queue<string> recentWords = new Queue<string>(); 
-
-    [Header("Word Discovery System")]
     private HashSet<string> discoveredWords = new HashSet<string>();
+
+    [Header("Discard & Shuffle System")]
+    public int discardCooldownTurns = 0; 
+    private bool shouldDoubleDrawNextTurn = false; 
+    public TextMeshProUGUI discardCooldownTextUI; 
+    private bool hasShuffledThisTurn = false; // PATCH: Free Shuffle Tracker
 
     void Start()
     {
@@ -53,14 +60,12 @@ public class WordManager : MonoBehaviour
         
         currentInk = 4; 
         UpdateInkUI();
+        UpdateDiscardUI();
 
         for (int i = 0; i < startingHandSize; i++)
         {
             DrawNewCard();
         }
-
-        // Start the global turn timer the moment the game begins!
-        StartTurnTimer();
     }
 
     void Update()
@@ -80,6 +85,17 @@ public class WordManager : MonoBehaviour
                 StopTimer();
                 EndTurn(); 
             }
+        }
+    }
+
+    // PATCH: Called by CardInteraction when a card is clicked for the first time
+    public void NotifyCardClicked()
+    {
+        if (!hasStartedTurnTimer)
+        {
+            StartTurnTimer();
+            hasStartedTurnTimer = true;
+            Debug.Log("<color=yellow>Planning Phase over! 60-second timer started.</color>");
         }
     }
 
@@ -109,12 +125,6 @@ public class WordManager : MonoBehaviour
     {
         if (CardInteraction.currentlyPlayedCard != null)
         {
-            // if (playerTarget != null && playerTarget.isStunned)
-            // {
-            //     Debug.LogWarning("You are STUNNED by Binding! You cannot cast spells. You must click End Turn.");
-            //     return; 
-            // }
-
             string submittedWord = wordInputField.text;
 
             if (submittedWord.Length <= 2)
@@ -168,7 +178,7 @@ public class WordManager : MonoBehaviour
             int finalPower = Mathf.RoundToInt(basePower * multiplier);
 
             string discoveryLog = isNewDiscovery ? " <color=yellow>[NEW DISCOVERY x1.5]</color>" : "";
-            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}' (Eff Length: {effectiveLength}). Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>{discoveryLog}");
+            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}'. Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>{discoveryLog}");
 
             if (spellName == "Fireball")
             {
@@ -200,8 +210,6 @@ public class WordManager : MonoBehaviour
                 }
             }
 
-            // NOTE: We no longer stop the timer here! The turn keeps going!
-
             Destroy(CardInteraction.currentlyPlayedCard.gameObject);
             CardInteraction.currentlyPlayedCard = null;
 
@@ -215,8 +223,7 @@ public class WordManager : MonoBehaviour
 
     public void DrawNewCard()
     {
-        string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWY"; 
-        List<char> availableLetters = new List<char>(alphabet.ToCharArray());
+        List<char> availableLetters = new List<char>(allowedAlphabet.ToCharArray());
 
         foreach (Transform child in handContainer)
         {
@@ -229,7 +236,7 @@ public class WordManager : MonoBehaviour
 
         if (availableLetters.Count == 0)
         {
-            availableLetters = new List<char>(alphabet.ToCharArray());
+            availableLetters = new List<char>(allowedAlphabet.ToCharArray());
         }
 
         char chosenLetter = availableLetters[Random.Range(0, availableLetters.Count)];
@@ -243,6 +250,167 @@ public class WordManager : MonoBehaviour
         newCardScript.spellInputPanel = this.spellInputPanel; 
         
         newCardScript.InitializeCardData(chosenLetter);
+    }
+
+    public void EndTurn()
+    {
+        Debug.Log("Player ended their turn!");
+
+        StopTimer(); 
+        hasStartedTurnTimer = false; // Reset the planning phase for next turn
+        hasShuffledThisTurn = false; // Reset free shuffle
+
+        if (CardInteraction.currentlyPlayedCard != null)
+        {
+            CardInteraction.currentlyPlayedCard.ReturnToHand();
+        }
+
+        int survivingCards = 0;
+
+        foreach (Transform child in handContainer)
+        {
+            CardInteraction card = child.GetComponent<CardInteraction>();
+            if (card != null)
+            {
+                if (card.lockedTurnsLeft > 0) card.DecreaseLock();
+                survivingCards++; 
+            }
+        }
+
+        if (currentInk == 0) currentInk += 5; 
+        else if (currentInk >= 8) currentInk += 3;
+        else currentInk += 4; 
+
+        if (currentInk > maxInk) currentInk = maxInk;
+        UpdateInkUI();
+        
+        int cardsToDraw = 0;
+        
+        if (survivingCards <= 1) cardsToDraw = 2; 
+        else cardsToDraw = 1; 
+
+        // PATCH: Double Draw Mechanic Check
+        if (shouldDoubleDrawNextTurn)
+        {
+            cardsToDraw *= 2; 
+            shouldDoubleDrawNextTurn = false; 
+            Debug.Log("<color=cyan>Double Draw Active!</color>");
+        }
+
+        if (survivingCards + cardsToDraw > maxHandSize)
+        {
+            cardsToDraw = maxHandSize - survivingCards;
+        }
+
+        for (int i = 0; i < cardsToDraw; i++)
+        {
+            DrawNewCard();
+        }
+
+        // PATCH: Reduce discard cooldown
+        if (discardCooldownTurns > 0) discardCooldownTurns--;
+        UpdateDiscardUI();
+
+        if (enemyTarget != null) enemyTarget.TakeTurn(); 
+        if (playerTarget != null) playerTarget.HandleStartOfTurn(); 
+    }
+
+    public void DiscardSelectedCard()
+    {
+        if (CardInteraction.currentlyPlayedCard != null)
+        {
+            if (discardCooldownTurns > 0)
+            {
+                Debug.LogWarning($"Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
+                return;
+            }
+
+            NotifyCardClicked(); // Ensures the timer is running if they discard immediately
+            CardInteraction cardToDiscard = CardInteraction.currentlyPlayedCard;
+            
+            if (cardToDiscard.inkCost == 1)
+            {
+                shouldDoubleDrawNextTurn = true;
+                Debug.Log("<color=orange>Discarded 1-Ink card: Double Draw activated for next turn!</color>");
+            }
+            else
+            {
+                int refund = Mathf.FloorToInt(cardToDiscard.inkCost * 0.5f);
+                currentInk += refund;
+                if (currentInk > maxInk) currentInk = maxInk;
+                UpdateInkUI();
+                Debug.Log($"<color=orange>Discarded {cardToDiscard.inkCost}-Ink card: Refunded {refund} Ink.</color>");
+            }
+
+            discardCooldownTurns = 2; 
+            UpdateDiscardUI();
+            
+            Destroy(cardToDiscard.gameObject);
+            CardInteraction.currentlyPlayedCard = null; 
+            
+            if (spellInputPanel != null) spellInputPanel.SetActive(false);
+            wordInputField.text = "";
+        }
+    }
+
+    public void ShuffleLetter()
+    {
+        if (CardInteraction.currentlyPlayedCard != null)
+        {
+            if (hasShuffledThisTurn)
+            {
+                Debug.LogWarning("You have already used your free shuffle this turn!");
+                return;
+            }
+
+            NotifyCardClicked(); // Ensures timer starts
+
+            hasShuffledThisTurn = true; // Mark as used
+            
+            List<char> availableLetters = new List<char>(allowedAlphabet.ToCharArray());
+
+            foreach (Transform child in handContainer)
+            {
+                CardInteraction existingCard = child.GetComponent<CardInteraction>();
+                if (existingCard != null && existingCard.currentLetter != '\0')
+                {
+                    availableLetters.Remove(existingCard.currentLetter);
+                }
+            }
+            
+            availableLetters.Remove(CardInteraction.currentlyPlayedCard.currentLetter);
+
+            if (availableLetters.Count == 0)
+            {
+                availableLetters = new List<char>(allowedAlphabet.ToCharArray());
+            }
+
+            char newLetter = availableLetters[Random.Range(0, availableLetters.Count)];
+
+            CardInteraction.currentlyPlayedCard.ChangeLetter(newLetter);
+
+            wordInputField.text = newLetter.ToString();
+            wordInputField.MoveTextEnd(false); 
+            
+            Debug.Log("<color=green>Used free Shuffle for this turn!</color>");
+        }
+    }
+
+    public void UpdateDiscardUI()
+    {
+        if (discardCooldownTextUI != null)
+        {
+            if (discardCooldownTurns > 0)
+            {
+                discardCooldownTextUI.text = $"Cooldown ({discardCooldownTurns})";
+                discardCooldownTextUI.color = new Color(0.8f, 0.4f, 0.4f); // A soft red
+            }
+            else
+            {
+                discardCooldownTextUI.text = "Discard";
+                discardCooldownTextUI.color = Color.white;
+            }
+        }
     }
 
     public void EnforceStartingLetter(string currentText)
@@ -266,121 +434,6 @@ public class WordManager : MonoBehaviour
     public void UpdateInkUI()
     {
         if (totalInkTextUI != null) totalInkTextUI.text = currentInk.ToString();
-    }
-
-    public void EndTurn()
-    {
-        Debug.Log("Player ended their turn!");
-
-        StopTimer(); // Pause it while the turn transition happens
-
-        // if (playerTarget != null)
-        // {
-        //     playerTarget.ClearStun();
-        // }
-
-        if (CardInteraction.currentlyPlayedCard != null)
-        {
-            CardInteraction.currentlyPlayedCard.ReturnToHand();
-        }
-
-        int survivingCards = 0;
-
-        foreach (Transform child in handContainer)
-        {
-            CardInteraction card = child.GetComponent<CardInteraction>();
-            if (card != null)
-            {
-                if (card.lockedTurnsLeft > 0)
-                {
-                    card.DecreaseLock();
-                }
-                survivingCards++; 
-            }
-        }
-
-        if (currentInk == 0) currentInk += 5; 
-        else if (currentInk >= 8) currentInk += 3;
-        else currentInk += 4; 
-
-        if (currentInk > maxInk) currentInk = maxInk;
-        UpdateInkUI();
-        
-        int cardsToDraw = 0;
-        
-        if (survivingCards <= 1) cardsToDraw = 2; 
-        else cardsToDraw = 1; 
-
-        if (survivingCards + cardsToDraw > maxHandSize)
-        {
-            cardsToDraw = maxHandSize - survivingCards;
-        }
-
-        for (int i = 0; i < cardsToDraw; i++)
-        {
-            DrawNewCard();
-        }
-
-        if (enemyTarget != null)
-        {
-            enemyTarget.TakeTurn(); 
-        }
-
-        if (playerTarget != null)
-        {
-            playerTarget.HandleStartOfTurn(); 
-        }
-
-        // Restart the fresh 60 seconds for the new turn!
-        StartTurnTimer();
-    }
-
-    // PATCH 2: Renamed to ShuffleLetter
-    public void ShuffleLetter()
-    {
-        if (CardInteraction.currentlyPlayedCard != null)
-        {
-            if (currentInk >= 1)
-            {
-                currentInk -= 1;
-                UpdateInkUI();
-
-                string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWY"; 
-                List<char> availableLetters = new List<char>(alphabet.ToCharArray());
-
-                foreach (Transform child in handContainer)
-                {
-                    CardInteraction existingCard = child.GetComponent<CardInteraction>();
-                    if (existingCard != null && existingCard.currentLetter != '\0')
-                    {
-                        availableLetters.Remove(existingCard.currentLetter);
-                    }
-                }
-                
-                availableLetters.Remove(CardInteraction.currentlyPlayedCard.currentLetter);
-
-                if (availableLetters.Count == 0)
-                {
-                    availableLetters = new List<char>(alphabet.ToCharArray());
-                }
-
-                char newLetter = availableLetters[Random.Range(0, availableLetters.Count)];
-
-                CardInteraction.currentlyPlayedCard.ChangeLetter(newLetter);
-
-                wordInputField.text = newLetter.ToString();
-                wordInputField.MoveTextEnd(false); 
-
-                // --- PATCH 2: Deduct 5 seconds instead of resetting ---
-                currentTimer -= 5f; 
-                // We do not need to manually check if it drops below 0 here. 
-                // The Update() loop will catch it on the very next frame and force an EndTurn!
-            }
-            else
-            {
-                Debug.LogWarning("Not enough Ink to shuffle this letter!");
-            }
-        }
     }
 
     public void UnzoomBackgroundClick()
