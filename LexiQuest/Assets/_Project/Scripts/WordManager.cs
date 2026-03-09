@@ -50,8 +50,11 @@ public class WordManager : MonoBehaviour
     [Header("Discard & Shuffle System")]
     public int discardCooldownTurns = 0; 
     private bool shouldDoubleDrawNextTurn = false; 
-    public TextMeshProUGUI discardCooldownTextUI; 
-    private bool hasShuffledThisTurn = false; // PATCH: Free Shuffle Tracker
+    public TextMeshProUGUI discardCooldownTextUI;
+    
+    [Header("Reroll System")]
+    public int currentRerollCost = 1; // Starts at 1 Ink
+    public TextMeshProUGUI rerollButtonTextUI; // PATCH: UI hook for the button text
 
     void Start()
     {
@@ -61,6 +64,7 @@ public class WordManager : MonoBehaviour
         currentInk = 4; 
         UpdateInkUI();
         UpdateDiscardUI();
+        UpdateRerollUI(); // <--- ADD THIS HERE
 
         for (int i = 0; i < startingHandSize; i++)
         {
@@ -258,7 +262,8 @@ public class WordManager : MonoBehaviour
 
         StopTimer(); 
         hasStartedTurnTimer = false; // Reset the planning phase for next turn
-        hasShuffledThisTurn = false; // Reset free shuffle
+        currentRerollCost = 1; // PATCH: Reset the escalating reroll cost back to 1
+        UpdateRerollUI(); // <--- ADD THIS HERE
 
         if (CardInteraction.currentlyPlayedCard != null)
         {
@@ -357,16 +362,29 @@ public class WordManager : MonoBehaviour
     {
         if (CardInteraction.currentlyPlayedCard != null)
         {
-            if (hasShuffledThisTurn)
+            // 1. Check if the player has enough Ink
+            if (currentInk < currentRerollCost)
             {
-                Debug.LogWarning("You have already used your free shuffle this turn!");
+                Debug.LogWarning($"Not enough Ink to reroll! You need {currentRerollCost} Ink.");
                 return;
             }
 
             NotifyCardClicked(); // Ensures timer starts
 
-            hasShuffledThisTurn = true; // Mark as used
+            // 2. Deduct the Ink and update the UI
+            currentInk -= currentRerollCost;
+            UpdateInkUI();
             
+            Debug.Log($"<color=green>Rerolled letter for {currentRerollCost} Ink!</color>");
+
+            // 3. Increment the cost for the next use, capping it at 3
+            if (currentRerollCost < 3)
+            {
+                currentRerollCost++;
+            }
+            UpdateRerollUI(); // <--- ADD THIS HERE
+
+            // 4. Perform the letter swap
             List<char> availableLetters = new List<char>(allowedAlphabet.ToCharArray());
 
             foreach (Transform child in handContainer)
@@ -391,8 +409,6 @@ public class WordManager : MonoBehaviour
 
             wordInputField.text = newLetter.ToString();
             wordInputField.MoveTextEnd(false); 
-            
-            Debug.Log("<color=green>Used free Shuffle for this turn!</color>");
         }
     }
 
@@ -455,5 +471,13 @@ public class WordManager : MonoBehaviour
         if (w.EndsWith("s") && len >= 4 && !w.EndsWith("ss")) return len - 1; 
 
         return len; 
+    }
+
+    public void UpdateRerollUI()
+    {
+        if (rerollButtonTextUI != null)
+        {
+            rerollButtonTextUI.text = $"Reroll ({currentRerollCost})";
+        }
     }
 }
