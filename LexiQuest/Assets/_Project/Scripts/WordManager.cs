@@ -62,6 +62,7 @@ public class WordManager : MonoBehaviour
         if (timerSlider != null) timerSlider.gameObject.SetActive(false); 
         
         currentInk = 4; 
+        discardCooldownTurns = 0; 
         UpdateInkUI();
         UpdateDiscardUI();
         UpdateRerollUI(); // <--- ADD THIS HERE
@@ -424,7 +425,7 @@ public class WordManager : MonoBehaviour
             else
             {
                 discardCooldownTextUI.text = "Discard";
-                discardCooldownTextUI.color = Color.white;
+                //discardCooldownTextUI.color = Color.white;
             }
         }
     }
