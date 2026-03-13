@@ -1,32 +1,32 @@
 using UnityEngine;
-using System.Collections.Generic; 
+using System.Collections.Generic;
 using DG.Tweening;
-using TMPro; 
+using TMPro;
 
 public class CardInteraction : MonoBehaviour
 {
-    public static CardInteraction currentlyZoomedCard; 
-    public static CardInteraction currentlyPlayedCard; 
+    public static CardInteraction currentlyZoomedCard;
+    public static CardInteraction currentlyPlayedCard;
 
     [Header("Card Data")]
-    public TextMeshProUGUI letterTextUI; 
-    public char currentLetter; 
-    public TextMeshProUGUI spellNameTextUI; 
-    public string currentSpell; 
-    public TextMeshProUGUI inkCostTextUI; 
+    public TextMeshProUGUI letterTextUI;
+    public char currentLetter;
+    public TextMeshProUGUI spellNameTextUI;
+    public string currentSpell;
+    public TextMeshProUGUI inkCostTextUI;
     public int inkCost;
 
     [Header("UI References")]
-    public TMP_InputField wordInputField; 
-    public GameObject spellInputPanel; 
+    public TMP_InputField wordInputField;
+    public GameObject spellInputPanel;
 
-    private int cardState = 0; 
+    private int cardState = 0;
     private Vector3 originalScale;
     private int originalIndex;
 
     public Transform inputDisplayArea;
     private Transform handContainer;
-    private Canvas cardCanvas; 
+    private Canvas cardCanvas;
 
     [Header("Status Effects")]
     public int lockedTurnsLeft = 0;
@@ -34,7 +34,7 @@ public class CardInteraction : MonoBehaviour
     void Start()
     {
         originalScale = transform.localScale;
-        handContainer = transform.parent; 
+        handContainer = transform.parent;
         cardCanvas = GetComponent<Canvas>();
     }
 
@@ -45,14 +45,14 @@ public class CardInteraction : MonoBehaviour
 
         List<string> offensiveSpells = new List<string> { "Fireball", "Ice Shards", "Wind Blades" };
         List<string> nonOffensiveSpells = new List<string> { "Bubble Shield", "Revitalize" };
-        
+
         List<string> allAvailableSpells = new List<string>();
         allAvailableSpells.AddRange(offensiveSpells);
         allAvailableSpells.AddRange(nonOffensiveSpells);
 
         Dictionary<string, int> spellCounts = new Dictionary<string, int>();
-        
-        if (transform.parent != null) 
+
+        if (transform.parent != null)
         {
             foreach (Transform child in transform.parent)
             {
@@ -71,11 +71,11 @@ public class CardInteraction : MonoBehaviour
         {
             if (kvp.Value >= 2)
             {
-                allAvailableSpells.Remove(kvp.Key); 
+                allAvailableSpells.Remove(kvp.Key);
             }
         }
 
-        if (allAvailableSpells.Count == 0) 
+        if (allAvailableSpells.Count == 0)
         {
             allAvailableSpells.AddRange(offensiveSpells);
             allAvailableSpells.AddRange(nonOffensiveSpells);
@@ -86,11 +86,11 @@ public class CardInteraction : MonoBehaviour
 
         if (offensiveSpells.Contains(currentSpell))
         {
-            inkCost = Random.Range(2, 5); 
+            inkCost = Random.Range(2, 5);
         }
         else
         {
-            inkCost = Random.Range(1, 4); 
+            inkCost = Random.Range(1, 4);
         }
 
         if (inkCostTextUI != null) inkCostTextUI.text = inkCost.ToString();
@@ -101,9 +101,9 @@ public class CardInteraction : MonoBehaviour
         if (lockedTurnsLeft > 0)
         {
             Debug.LogWarning("This card is locked for " + lockedTurnsLeft + " more turns!");
-            return; 
+            return;
         }
-        
+
         // --- PATCH: No more Star double-tap delay! Executes instantly ---
         ExecuteSingleTapLogic();
     }
@@ -114,19 +114,19 @@ public class CardInteraction : MonoBehaviour
         {
             if (currentlyZoomedCard != null && currentlyZoomedCard != this)
             {
-                currentlyZoomedCard.Unzoom(); 
+                currentlyZoomedCard.Unzoom();
             }
 
-            if (cardCanvas != null) cardCanvas.sortingOrder = 10; 
+            if (cardCanvas != null) cardCanvas.sortingOrder = 10;
 
             transform.DOScale(originalScale * 1.5f, 0.2f);
             cardState = 1;
-            currentlyZoomedCard = this; 
+            currentlyZoomedCard = this;
         }
         else if (cardState == 1)
         {
             // 1. Notify the timer FIRST
-            WordManager.instance.NotifyCardClicked(); 
+            WordManager.instance.NotifyCardClicked();
 
             // 2. THEN do the normal card checks
             if (currentlyPlayedCard != null && currentlyPlayedCard != this)
@@ -134,14 +134,14 @@ public class CardInteraction : MonoBehaviour
                 currentlyPlayedCard.ReturnToHand();
             }
 
-            originalIndex = transform.GetSiblingIndex(); 
+            originalIndex = transform.GetSiblingIndex();
             transform.SetParent(inputDisplayArea, false);
-            transform.DOScale(originalScale * 1.5f, 0.2f); 
-            
-            if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
-            
-            cardState = 2; 
-            currentlyZoomedCard = null; 
+            transform.DOScale(originalScale * 1.5f, 0.2f);
+
+            if (cardCanvas != null) cardCanvas.sortingOrder = 0;
+
+            cardState = 2;
+            currentlyZoomedCard = null;
             currentlyPlayedCard = this;
 
             // DELETED: WordManager.instance.StartTimer(); 
@@ -149,9 +149,9 @@ public class CardInteraction : MonoBehaviour
             if (spellInputPanel != null)
             {
                 spellInputPanel.SetActive(true);
-                wordInputField.text = currentLetter.ToString(); 
-                wordInputField.ActivateInputField(); 
-                wordInputField.MoveTextEnd(false); 
+                wordInputField.text = currentLetter.ToString();
+                wordInputField.ActivateInputField();
+                wordInputField.MoveTextEnd(false);
             }
         }
         else if (cardState == 2)
@@ -165,7 +165,7 @@ public class CardInteraction : MonoBehaviour
         if (cardState == 1)
         {
             transform.DOScale(originalScale, 0.2f);
-            if (cardCanvas != null) cardCanvas.sortingOrder = 0; 
+            if (cardCanvas != null) cardCanvas.sortingOrder = 0;
             cardState = 0;
 
             if (currentlyZoomedCard == this) currentlyZoomedCard = null;
@@ -177,22 +177,22 @@ public class CardInteraction : MonoBehaviour
         if (cardState == 2)
         {
             transform.SetParent(handContainer, false);
-            transform.SetSiblingIndex(originalIndex); 
-            
+            transform.SetSiblingIndex(originalIndex);
+
             transform.DOScale(originalScale, 0.2f);
 
             cardState = 0;
-            
+
             // DELETED: WordManager.instance.StopTimer(); 
-            
+
             if (currentlyPlayedCard == this)
             {
                 currentlyPlayedCard = null;
-                
+
                 if (spellInputPanel != null)
                 {
-                    spellInputPanel.SetActive(false); 
-                    wordInputField.text = ""; 
+                    spellInputPanel.SetActive(false);
+                    wordInputField.text = "";
                 }
             }
         }
@@ -207,7 +207,7 @@ public class CardInteraction : MonoBehaviour
     public void LockCard(int turns)
     {
         lockedTurnsLeft = turns;
-        
+
         UnityEngine.UI.Image cardImage = GetComponent<UnityEngine.UI.Image>();
         if (cardImage != null) cardImage.color = new Color(0.4f, 0.4f, 0.4f, 1f);
     }
@@ -231,7 +231,7 @@ public class CardInteraction : MonoBehaviour
         {
             currentlyPlayedCard = null;
         }
-        
+
         if (currentlyZoomedCard == this)
         {
             currentlyZoomedCard = null;

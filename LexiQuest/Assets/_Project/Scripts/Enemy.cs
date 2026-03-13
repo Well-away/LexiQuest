@@ -9,14 +9,14 @@ public class Enemy : MonoBehaviour
 
     [Header("Battle Targets")]
     public player playerTarget;
-    public WordManager wordManager; 
+    public WordManager wordManager;
 
     [Header("Golem Cooldowns")]
     public int groundSlamCooldown = 0;
     public int hardenedSkinCooldown = 0;
-    public int crashingFistCooldown = 10; 
-    public int boulderThrowCooldown = 3; 
-    public int bindingCooldown = 5;      
+    public int crashingFistCooldown = 10;
+    public int boulderThrowCooldown = 3;
+    public int bindingCooldown = 5;
 
     private int hardenedSkinTurnsLeft = 0;
     public int currentWave = 1;
@@ -31,17 +31,17 @@ public class Enemy : MonoBehaviour
     {
         if (hardenedSkinTurnsLeft > 0)
         {
-            damage = Mathf.RoundToInt(damage * 0.5f); 
+            damage = Mathf.RoundToInt(damage * 0.5f);
             Debug.Log("<color=grey>Monster's Hardened Skin absorbed 50% of the damage!</color>");
         }
 
         currentHealth -= damage;
-        
-        if (currentHealth <= 0) 
+
+        if (currentHealth <= 0)
         {
             currentHealth = 0;
             healthBar.SetHealth(currentHealth);
-            SummonNextMonster(); 
+            SummonNextMonster();
         }
         else
         {
@@ -60,7 +60,7 @@ public class Enemy : MonoBehaviour
         }
 
         currentWave++;
-        maxHealth = Mathf.RoundToInt(maxHealth * 1.30f); 
+        maxHealth = Mathf.RoundToInt(maxHealth * 1.30f);
         currentHealth = maxHealth;
         healthBar.SetMaxHealth(maxHealth);
 
@@ -68,8 +68,8 @@ public class Enemy : MonoBehaviour
         hardenedSkinCooldown = 0;
         crashingFistCooldown = 10;
         hardenedSkinTurnsLeft = 0;
-        boulderThrowCooldown = 3; 
-        bindingCooldown = 5;      
+        boulderThrowCooldown = 3;
+        bindingCooldown = 5;
 
         Renderer enemyRenderer = GetComponent<Renderer>();
         if (enemyRenderer != null)
@@ -95,55 +95,66 @@ public class Enemy : MonoBehaviour
         if (hpPercent < 0.10f && crashingFistCooldown == 0)
         {
             CastCrashingFist(); // Phase 4: Under 10%
+            NotificationManager.instance.ShowMessage("CRASHING FIST! Golem steals HP!");
         }
         else if (hpPercent < 0.45f && bindingCooldown == 0)
         {
             CastBinding();      // Phase 3: Under 45%
+            NotificationManager.instance.ShowMessage("Golem uses Binding! Ink Drained!");
         }
         else if (hpPercent < 0.70f && groundSlamCooldown == 0)
         {
             CastGroundSlam();   // Phase 2: Under 70%
+            NotificationManager.instance.ShowMessage("Ground Slam! Cards Locked!");
         }
         // Phase 1: 70% or above (or if ultimate/special skills are on cooldown)
         else if (hardenedSkinCooldown == 0)
         {
             CastHardenedSkin();
+            NotificationManager.instance.ShowMessage("Hardened Skin! 50% Damage Reduction!");
         }
         else if (boulderThrowCooldown == 0)
         {
             CastBoulderThrow();
+            NotificationManager.instance.ShowMessage("Golem uses Boulder Throw!");
         }
         else
         {
             BasicAttack();
+            NotificationManager.instance.ShowMessage("Golem uses Basic Attack!");
         }
     }
 
     private void BasicAttack()
     {
         int damage = Mathf.RoundToInt(playerTarget.currentHealth * 0.08f);
-        if (damage < 1) damage = 1; 
+        if (damage < 1) damage = 1;
         Debug.Log($"<color=orange>Monster uses Basic Attack!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
     }
 
     private void CastBoulderThrow()
     {
+        // 1. Show the Banner
+        NotificationManager.instance.ShowMessage("Golem uses Boulder Throw!");
         boulderThrowCooldown = 4;
         int damage = 10 + Mathf.RoundToInt(playerTarget.maxHealth * 0.10f);
         Debug.Log($"<color=red>Monster uses Boulder Throw!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
+        // 3. Hide the Banner after 1.5 seconds
+        NotificationManager.instance.Invoke("HideMessage", 1.5f);
     }
 
     private void CastBinding()
     {
         bindingCooldown = 6;
+        NotificationManager.instance.ShowMessage("Golem uses Binding! Ink Drained!");
         int lostHP = maxHealth - currentHealth;
-        
+
         // PATCH: 25% of Golem's LOST HP
         int damage = Mathf.RoundToInt(lostHP * 0.25f);
         int dotDamage = Mathf.RoundToInt(playerTarget.maxHealth * 0.05f);
-        
+
         Debug.Log($"<color=magenta>Monster uses BINDING!</color> Deals {damage} damage, drains 5 Ink, and applies a {dotDamage} DoT for 2 turns!");
         playerTarget.TakeDamage(damage);
 
@@ -160,10 +171,12 @@ public class Enemy : MonoBehaviour
         {
             playerTarget.ApplyBindingDoT(2, dotDamage);
         }
+        NotificationManager.instance.Invoke("HideMessage", 2.0f); // Adjust duration as needed
     }
 
     private void CastGroundSlam()
     {
+        NotificationManager.instance.ShowMessage("Ground Slam! Cards Locked!");
         groundSlamCooldown = 6;
         // PATCH: 25% of Amy's CURRENT HP
         int damage = Mathf.RoundToInt(playerTarget.currentHealth * 0.25f);
@@ -187,26 +200,30 @@ public class Enemy : MonoBehaviour
             {
                 int randIndex = Random.Range(0, unlockedCards.Count);
                 unlockedCards[randIndex].LockCard(2);
-                unlockedCards.RemoveAt(randIndex); 
+                unlockedCards.RemoveAt(randIndex);
             }
+            NotificationManager.instance.Invoke("HideMessage", 2.0f); // Adjust duration as needed
         }
     }
 
     private void CastHardenedSkin()
     {
+        NotificationManager.instance.ShowMessage("Hardened Skin! 50% Damage Reduction!");
         hardenedSkinCooldown = 6;
         hardenedSkinTurnsLeft = 3;
         Debug.Log("<color=grey>Monster uses Hardened Skin!</color> Takes 50% less damage for 3 turns.");
+        NotificationManager.instance.Invoke("HideMessage", 2.0f); // Adjust duration as needed
     }
 
     private void CastCrashingFist()
     {
+        NotificationManager.instance.ShowMessage("CRASHING FIST! Golem steals HP!");
         crashingFistCooldown = 10;
-        
+
         // PATCH: Damage is 50% of Golem's LOST HP
         int lostHP = maxHealth - currentHealth;
         int damage = Mathf.RoundToInt(lostHP * 0.50f);
-        
+
         Debug.Log($"<color=magenta>Monster uses CRASHING FIST (Ultimate)!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
 
@@ -216,5 +233,7 @@ public class Enemy : MonoBehaviour
         if (currentHealth > maxHealth) currentHealth = maxHealth; // Prevent over-healing
         healthBar.SetHealth(currentHealth);
         Debug.Log($"<color=green>Monster heals for {healAmount} HP from Crashing Fist!</color>");
+        // Make big ultimate moves stay on screen a little longer! (2.5 seconds)
+        NotificationManager.instance.Invoke("HideMessage", 2.5f);
     }
 }

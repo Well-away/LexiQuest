@@ -1,8 +1,8 @@
 using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
-using System.Linq; 
-using UnityEngine.UI; 
+using System.Linq;
+using UnityEngine.UI;
 
 public class WordManager : MonoBehaviour
 {
@@ -16,42 +16,42 @@ public class WordManager : MonoBehaviour
     [Header("UI References")]
     public TMP_InputField wordInputField;
     public Transform inputDisplayArea;
-    public GameObject spellInputPanel; 
-    
+    public GameObject spellInputPanel;
+
     [Header("Card Spawning")]
-    public GameObject cardPrefab; 
-    public Transform handContainer; 
-    public int startingHandSize = 2; 
-    public int maxHandSize = 5; 
+    public GameObject cardPrefab;
+    public Transform handContainer;
+    public int startingHandSize = 2;
+    public int maxHandSize = 5;
     // PATCH: Excluded X, Q, V, Z from the pool!
-    private string allowedAlphabet = "ABCDEFGHIJKLMNOPRSTUWY"; 
+    private string allowedAlphabet = "ABCDEFGHIJKLMNOPRSTUWY";
 
     [Header("Ink System")]
-    public int maxInk = 15; 
-    public int currentInk; 
+    public int maxInk = 15;
+    public int currentInk;
     public TextMeshProUGUI totalInkTextUI;
-    
+
     [Header("Battle Targets")]
-    public player playerTarget; 
+    public player playerTarget;
     public Enemy enemyTarget;
 
     [Header("Timer System")]
-    public Slider timerSlider; 
-    public float maxTurnTime = 60f; 
-    private float currentTimer; 
+    public Slider timerSlider;
+    public float maxTurnTime = 60f;
+    private float currentTimer;
     private bool isTimerRunning = false;
     private bool hasStartedTurnTimer = false; // PATCH: Planning Phase Tracker
 
     [Header("Grimoire System")]
-    public int grimoireCooldown = 5; 
-    private Queue<string> recentWords = new Queue<string>(); 
+    public int grimoireCooldown = 5;
+    private Queue<string> recentWords = new Queue<string>();
     private HashSet<string> discoveredWords = new HashSet<string>();
 
     [Header("Discard & Shuffle System")]
-    public int discardCooldownTurns = 0; 
-    private bool shouldDoubleDrawNextTurn = false; 
+    public int discardCooldownTurns = 0;
+    private bool shouldDoubleDrawNextTurn = false;
     public TextMeshProUGUI discardCooldownTextUI;
-    
+
     [Header("Reroll System")]
     public int currentRerollCost = 1; // Starts at 1 Ink
     public TextMeshProUGUI rerollButtonTextUI; // PATCH: UI hook for the button text
@@ -59,13 +59,13 @@ public class WordManager : MonoBehaviour
     void Start()
     {
         if (spellInputPanel != null) spellInputPanel.SetActive(false);
-        if (timerSlider != null) timerSlider.gameObject.SetActive(false); 
-        
-        currentInk = 4; 
-        discardCooldownTurns = 0; 
+        if (timerSlider != null) timerSlider.gameObject.SetActive(false);
+
+        currentInk = 4;
+        discardCooldownTurns = 0;
         UpdateInkUI();
         UpdateDiscardUI();
-        UpdateRerollUI(); // <--- ADD THIS HERE
+        UpdateRerollUI();
 
         for (int i = 0; i < startingHandSize; i++)
         {
@@ -77,9 +77,9 @@ public class WordManager : MonoBehaviour
     {
         if (isTimerRunning)
         {
-            currentTimer -= Time.deltaTime; 
-            
-            if (timerSlider != null) 
+            currentTimer -= Time.deltaTime;
+
+            if (timerSlider != null)
             {
                 timerSlider.value = currentTimer;
             }
@@ -88,7 +88,7 @@ public class WordManager : MonoBehaviour
             {
                 Debug.LogWarning("<color=red>Time's up!</color> Turn automatically ended.");
                 StopTimer();
-                EndTurn(); 
+                EndTurn();
             }
         }
     }
@@ -108,21 +108,21 @@ public class WordManager : MonoBehaviour
     {
         currentTimer = maxTurnTime;
         isTimerRunning = true;
-        
-        if (timerSlider != null) 
+
+        if (timerSlider != null)
         {
-            timerSlider.maxValue = maxTurnTime; 
+            timerSlider.maxValue = maxTurnTime;
             timerSlider.value = currentTimer;
-            timerSlider.gameObject.SetActive(true); 
+            timerSlider.gameObject.SetActive(true);
         }
     }
 
     public void StopTimer()
     {
         isTimerRunning = false;
-        if (timerSlider != null) 
+        if (timerSlider != null)
         {
-            timerSlider.gameObject.SetActive(false); 
+            timerSlider.gameObject.SetActive(false);
         }
     }
 
@@ -135,31 +135,32 @@ public class WordManager : MonoBehaviour
             if (submittedWord.Length <= 2)
             {
                 Debug.LogWarning("Word is too short! Spells require at least 3 letters.");
-                return; 
+                return;
             }
 
             int costOfSpell = CardInteraction.currentlyPlayedCard.inkCost;
             if (currentInk < costOfSpell)
             {
                 Debug.LogWarning("Not enough Ink to cast this spell!");
-                return; 
+                NotificationManager.instance.ShowMessage("Not enough Ink to cast this spell!");
+                return;
             }
 
             string spellName = CardInteraction.currentlyPlayedCard.currentSpell;
-            int basePower = costOfSpell * 5; 
-            
+            int basePower = costOfSpell * 5;
+
             int effectiveLength = GetEffectiveWordLength(submittedWord);
             float multiplier = 1.0f;
 
-            if (effectiveLength <= 4) 
+            if (effectiveLength <= 4)
             {
-                multiplier = 0.5f;     
+                multiplier = 0.5f;
             }
-            else if (effectiveLength == 5) 
+            else if (effectiveLength == 5)
             {
-                multiplier = 1.0f; 
+                multiplier = 1.0f;
             }
-            else if (effectiveLength >= 6) 
+            else if (effectiveLength >= 6)
             {
                 multiplier = 1.0f + ((effectiveLength - 5) * 0.12f);
             }
@@ -169,25 +170,27 @@ public class WordManager : MonoBehaviour
             bool isNewDiscovery = !discoveredWords.Contains(normalizedWord);
             if (isNewDiscovery)
             {
-                multiplier *= 1.5f; 
+                multiplier *= 1.5f;
                 discoveredWords.Add(normalizedWord);
             }
 
             bool isSpam = recentWords.Contains(normalizedWord);
             if (isSpam)
             {
-                multiplier *= 0.5f; 
+                multiplier *= 0.5f;
                 Debug.LogWarning($"<color=orange>GRIMOIRE PENALTY!</color> '{submittedWord}' is on cooldown! Damage reduced by 50%.");
             }
 
             int finalPower = Mathf.RoundToInt(basePower * multiplier);
 
-            string discoveryLog = isNewDiscovery ? " <color=yellow>[NEW DISCOVERY x1.5]</color>" : "";
-            Debug.Log($"<color=cyan>CASTING:</color> {spellName} via '{submittedWord}'. Base: {basePower} * Mult: {multiplier}x = <color=yellow>{finalPower} Power!</color>{discoveryLog}");
+            // Replace your old Debug.Log with this:
+            string discoveryLog = isNewDiscovery ? " (New Discovery!)" : "";
+            NotificationManager.instance.ShowMessage($"Cast {spellName}! {finalPower} Power!{discoveryLog}");
+            
 
             if (spellName == "Fireball")
             {
-                finalPower += 5; 
+                finalPower += 5;
                 if (enemyTarget != null) enemyTarget.TakeDamage(finalPower);
             }
             else if (spellName == "Ice Shards" || spellName == "Wind Blades")
@@ -206,12 +209,12 @@ public class WordManager : MonoBehaviour
             currentInk -= costOfSpell;
             UpdateInkUI();
 
-            if (!isSpam) 
+            if (!isSpam)
             {
                 recentWords.Enqueue(normalizedWord);
                 if (recentWords.Count > grimoireCooldown)
                 {
-                    recentWords.Dequeue(); 
+                    recentWords.Dequeue();
                 }
             }
 
@@ -221,8 +224,9 @@ public class WordManager : MonoBehaviour
             wordInputField.text = "";
             if (spellInputPanel != null)
             {
-                spellInputPanel.SetActive(false); 
+                spellInputPanel.SetActive(false);
             }
+            NotificationManager.instance.Invoke("HideMessage", 2.0f);
         }
     }
 
@@ -248,12 +252,12 @@ public class WordManager : MonoBehaviour
 
         GameObject newCard = Instantiate(cardPrefab, handContainer, false);
         newCard.transform.localScale = Vector3.one;
-        
+
         CardInteraction newCardScript = newCard.GetComponent<CardInteraction>();
         newCardScript.inputDisplayArea = this.inputDisplayArea;
         newCardScript.wordInputField = this.wordInputField;
-        newCardScript.spellInputPanel = this.spellInputPanel; 
-        
+        newCardScript.spellInputPanel = this.spellInputPanel;
+
         newCardScript.InitializeCardData(chosenLetter);
     }
 
@@ -261,10 +265,10 @@ public class WordManager : MonoBehaviour
     {
         Debug.Log("Player ended their turn!");
 
-        StopTimer(); 
+        StopTimer();
         hasStartedTurnTimer = false; // Reset the planning phase for next turn
         currentRerollCost = 1; // PATCH: Reset the escalating reroll cost back to 1
-        UpdateRerollUI(); // <--- ADD THIS HERE
+        UpdateRerollUI();
 
         if (CardInteraction.currentlyPlayedCard != null)
         {
@@ -279,28 +283,28 @@ public class WordManager : MonoBehaviour
             if (card != null)
             {
                 if (card.lockedTurnsLeft > 0) card.DecreaseLock();
-                survivingCards++; 
+                survivingCards++;
             }
         }
 
-        if (currentInk == 0) currentInk += 5; 
-        else if (currentInk >= 8) currentInk += 3;
-        else currentInk += 4; 
-
+        if (currentInk == 0) { currentInk += 5; NotificationManager.instance.ShowMessage("Gained 5 Ink!"); }
+        else if (currentInk >= 8) { currentInk += 3; NotificationManager.instance.ShowMessage("Gained 3 Ink!"); }
+        else { currentInk += 4; NotificationManager.instance.ShowMessage("Gained 4 Ink!"); }
         if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
-        
+
         int cardsToDraw = 0;
-        
-        if (survivingCards <= 1) cardsToDraw = 2; 
-        else cardsToDraw = 1; 
+
+        if (survivingCards <= 1) cardsToDraw = 2;
+        else cardsToDraw = 1;
 
         // PATCH: Double Draw Mechanic Check
         if (shouldDoubleDrawNextTurn)
         {
-            cardsToDraw *= 2; 
-            shouldDoubleDrawNextTurn = false; 
+            cardsToDraw *= 2;
+            shouldDoubleDrawNextTurn = false;
             Debug.Log("<color=cyan>Double Draw Active!</color>");
+            NotificationManager.instance.ShowMessage("Double Draw Activated!");
         }
 
         if (survivingCards + cardsToDraw > maxHandSize)
@@ -317,8 +321,8 @@ public class WordManager : MonoBehaviour
         if (discardCooldownTurns > 0) discardCooldownTurns--;
         UpdateDiscardUI();
 
-        if (enemyTarget != null) enemyTarget.TakeTurn(); 
-        if (playerTarget != null) playerTarget.HandleStartOfTurn(); 
+        if (enemyTarget != null) enemyTarget.TakeTurn();
+        if (playerTarget != null) playerTarget.HandleStartOfTurn();
     }
 
     public void DiscardSelectedCard()
@@ -328,12 +332,13 @@ public class WordManager : MonoBehaviour
             if (discardCooldownTurns > 0)
             {
                 Debug.LogWarning($"Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
+                NotificationManager.instance.ShowMessage("Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
                 return;
             }
 
-            NotifyCardClicked(); // Ensures the timer is running if they discard immediately
+            NotifyCardClicked();
             CardInteraction cardToDiscard = CardInteraction.currentlyPlayedCard;
-            
+
             if (cardToDiscard.inkCost == 1)
             {
                 shouldDoubleDrawNextTurn = true;
@@ -345,17 +350,19 @@ public class WordManager : MonoBehaviour
                 currentInk += refund;
                 if (currentInk > maxInk) currentInk = maxInk;
                 UpdateInkUI();
+                NotificationManager.instance.ShowMessage($"Discard Refund: +{refund} Ink!");
                 Debug.Log($"<color=orange>Discarded {cardToDiscard.inkCost}-Ink card: Refunded {refund} Ink.</color>");
             }
 
-            discardCooldownTurns = 2; 
+            discardCooldownTurns = 2;
             UpdateDiscardUI();
-            
+
             Destroy(cardToDiscard.gameObject);
-            CardInteraction.currentlyPlayedCard = null; 
-            
+            CardInteraction.currentlyPlayedCard = null;
+
             if (spellInputPanel != null) spellInputPanel.SetActive(false);
             wordInputField.text = "";
+            NotificationManager.instance.Invoke("HideMessage", 1.0f);
         }
     }
 
@@ -375,7 +382,7 @@ public class WordManager : MonoBehaviour
             // 2. Deduct the Ink and update the UI
             currentInk -= currentRerollCost;
             UpdateInkUI();
-            
+
             Debug.Log($"<color=green>Rerolled letter for {currentRerollCost} Ink!</color>");
 
             // 3. Increment the cost for the next use, capping it at 3
@@ -383,7 +390,7 @@ public class WordManager : MonoBehaviour
             {
                 currentRerollCost++;
             }
-            UpdateRerollUI(); // <--- ADD THIS HERE
+            UpdateRerollUI();
 
             // 4. Perform the letter swap
             List<char> availableLetters = new List<char>(allowedAlphabet.ToCharArray());
@@ -396,7 +403,7 @@ public class WordManager : MonoBehaviour
                     availableLetters.Remove(existingCard.currentLetter);
                 }
             }
-            
+
             availableLetters.Remove(CardInteraction.currentlyPlayedCard.currentLetter);
 
             if (availableLetters.Count == 0)
@@ -409,7 +416,7 @@ public class WordManager : MonoBehaviour
             CardInteraction.currentlyPlayedCard.ChangeLetter(newLetter);
 
             wordInputField.text = newLetter.ToString();
-            wordInputField.MoveTextEnd(false); 
+            wordInputField.MoveTextEnd(false);
         }
     }
 
@@ -438,7 +445,7 @@ public class WordManager : MonoBehaviour
         if (string.IsNullOrEmpty(currentText))
         {
             wordInputField.text = requiredLetter.ToString();
-            wordInputField.MoveTextEnd(false); 
+            wordInputField.MoveTextEnd(false);
             return;
         }
 
@@ -466,12 +473,12 @@ public class WordManager : MonoBehaviour
         string w = word.ToLower();
         int len = w.Length;
 
-        if (w.EndsWith("ing") && len >= 6) return len - 3; 
-        if (w.EndsWith("ed") && len >= 5) return len - 2;  
-        if (w.EndsWith("es") && len >= 5) return len - 2;  
-        if (w.EndsWith("s") && len >= 4 && !w.EndsWith("ss")) return len - 1; 
+        if (w.EndsWith("ing") && len >= 6) return len - 3;
+        if (w.EndsWith("ed") && len >= 5) return len - 2;
+        if (w.EndsWith("es") && len >= 5) return len - 2;
+        if (w.EndsWith("s") && len >= 4 && !w.EndsWith("ss")) return len - 1;
 
-        return len; 
+        return len;
     }
 
     public void UpdateRerollUI()
