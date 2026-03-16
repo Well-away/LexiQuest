@@ -135,6 +135,7 @@ public class WordManager : MonoBehaviour
             if (submittedWord.Length <= 2)
             {
                 Debug.LogWarning("Word is too short! Spells require at least 3 letters.");
+                NotificationManager.instance.ShowMessage("Word too short! Need 3+ letters.");
                 return;
             }
 
@@ -332,7 +333,7 @@ public class WordManager : MonoBehaviour
             if (discardCooldownTurns > 0)
             {
                 Debug.LogWarning($"Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
-                NotificationManager.instance.ShowMessage("Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
+                NotificationManager.instance.ShowMessage($"Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
                 return;
             }
 
@@ -374,6 +375,7 @@ public class WordManager : MonoBehaviour
             if (currentInk < currentRerollCost)
             {
                 Debug.LogWarning($"Not enough Ink to reroll! You need {currentRerollCost} Ink.");
+                NotificationManager.instance.ShowMessage($"Not enough Ink! Need {currentRerollCost}.");
                 return;
             }
 

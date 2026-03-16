@@ -89,6 +89,12 @@ public class Enemy : MonoBehaviour
         if (boulderThrowCooldown > 0) boulderThrowCooldown--;
         if (bindingCooldown > 0) bindingCooldown--;
 
+        // Clear any leftover player notifications before starting monster actions
+        NotificationManager.instance.HideMessage();
+
+        // PATCH 4: Announce the start of the Monster's turn
+        NotificationManager.instance.ShowMessage("Monster Turn!");
+
         float hpPercent = (float)currentHealth / maxHealth;
 
         // --- NEW: PHASE-BASED AI PRIORITY ---
@@ -127,10 +133,13 @@ public class Enemy : MonoBehaviour
 
     private void BasicAttack()
     {
+        // PATCH 5: Announce the specific skill
+        NotificationManager.instance.ShowMessage("Golem uses Basic Attack!");
         int damage = Mathf.RoundToInt(playerTarget.currentHealth * 0.08f);
         if (damage < 1) damage = 1;
         Debug.Log($"<color=orange>Monster uses Basic Attack!</color> Deals {damage} damage.");
         playerTarget.TakeDamage(damage);
+        NotificationManager.instance.Invoke("HideMessage", 1.5f);
     }
 
     private void CastBoulderThrow()
