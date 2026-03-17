@@ -71,6 +71,10 @@ public class WordManager : MonoBehaviour
         {
             DrawNewCard();
         }
+
+        // Start the timer for the very first turn
+        StartTurnTimer();
+        hasStartedTurnTimer = true;
     }
 
     void Update()
@@ -322,6 +326,10 @@ public class WordManager : MonoBehaviour
         if (discardCooldownTurns > 0) discardCooldownTurns--;
         UpdateDiscardUI();
 
+        // PATCH 9: Start the timer for the NEXT turn immediately
+        StartTurnTimer();
+        hasStartedTurnTimer = true;
+
         if (enemyTarget != null) enemyTarget.TakeTurn();
         if (playerTarget != null) playerTarget.HandleStartOfTurn();
     }
@@ -332,28 +340,22 @@ public class WordManager : MonoBehaviour
         {
             if (discardCooldownTurns > 0)
             {
-                Debug.LogWarning($"Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
                 NotificationManager.instance.ShowMessage($"Discard on cooldown! Wait {discardCooldownTurns} more turn(s).");
                 return;
             }
 
-            NotifyCardClicked();
             CardInteraction cardToDiscard = CardInteraction.currentlyPlayedCard;
 
-            if (cardToDiscard.inkCost == 1)
-            {
-                shouldDoubleDrawNextTurn = true;
-                Debug.Log("<color=orange>Discarded 1-Ink card: Double Draw activated for next turn!</color>");
-            }
-            else
-            {
-                int refund = Mathf.FloorToInt(cardToDiscard.inkCost * 0.5f);
-                currentInk += refund;
-                if (currentInk > maxInk) currentInk = maxInk;
-                UpdateInkUI();
-                NotificationManager.instance.ShowMessage($"Discard Refund: +{refund} Ink!");
-                Debug.Log($"<color=orange>Discarded {cardToDiscard.inkCost}-Ink card: Refunded {refund} Ink.</color>");
-            }
+            // Calculate 50% Refund (Floor)
+            int refund = Mathf.FloorToInt(cardToDiscard.inkCost * 0.5f);
+            currentInk += refund;
+            if (currentInk > maxInk) currentInk = maxInk;
+            UpdateInkUI();
+
+            NotificationManager.instance.ShowMessage($"Discarded! +{refund} Ink & Drawing New Card...");
+
+            // PATCH 8: Draw a new card immediately to replace the discarded one
+            DrawNewCard();
 
             discardCooldownTurns = 2;
             UpdateDiscardUI();
@@ -363,7 +365,6 @@ public class WordManager : MonoBehaviour
 
             if (spellInputPanel != null) spellInputPanel.SetActive(false);
             wordInputField.text = "";
-            NotificationManager.instance.Invoke("HideMessage", 1.0f);
         }
     }
 

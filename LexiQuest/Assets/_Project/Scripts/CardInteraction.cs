@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
+using UnityEngine.EventSystems;
 
 public class CardInteraction : MonoBehaviour
 {
@@ -150,7 +151,16 @@ public class CardInteraction : MonoBehaviour
             {
                 spellInputPanel.SetActive(true);
                 wordInputField.text = currentLetter.ToString();
-                wordInputField.ActivateInputField();
+
+                // --- PATCH: Force Focus and Keyboard Activation ---
+                EventSystem.current.SetSelectedGameObject(wordInputField.gameObject, null);
+                // 1. Force the UI system to highlight this box
+                wordInputField.Select(); 
+                
+                // 2. Tell the mobile OS to bring up the keyboard
+                wordInputField.ActivateInputField(); 
+                
+                // 3. Ensure the blinking cursor is AFTER the starting letter
                 wordInputField.MoveTextEnd(false);
             }
         }
