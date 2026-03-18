@@ -49,6 +49,7 @@ public class WordManager : MonoBehaviour
 
     [Header("Discard & Shuffle System")]
     public int discardCooldownTurns = 0;
+    private int healDrawLockoutTurns = 0; // Tracks the 2-turn draw penalty
     private bool shouldDoubleDrawNextTurn = false;
     public TextMeshProUGUI discardCooldownTextUI;
 
@@ -204,11 +205,34 @@ public class WordManager : MonoBehaviour
             }
             else if (spellName == "Revitalize")
             {
-                if (playerTarget != null) playerTarget.Heal(finalPower);
-            }
-            else if (spellName == "Bubble Shield")
-            {
-                if (playerTarget != null) playerTarget.AddShield(finalPower);
+                // 1. Base Math: 3-letter = 5HP, 4-letter = 10HP
+                float baseHeal = (effectiveLength == 3) ? 5f : 10f;
+                int extraLetters = Mathf.Max(0, effectiveLength - 4);
+                
+                // 2. Complexity Bonus: Tier 2 (+2), Tier 3 (+3)
+                float bonusPerLetter = 1f; 
+                if (multiplier >= 1.5f) bonusPerLetter = 3f; 
+                else if (multiplier > 1.0f) bonusPerLetter = 2f; 
+
+                float totalHeal = baseHeal + (extraLetters * bonusPerLetter);
+
+                // 3. Emergency Multipliers (+25% or +50%)
+                float hpPercent = (float)playerTarget.currentHealth / playerTarget.maxHealth;
+                if (hpPercent <= 0.10f) totalHeal *= 1.50f; 
+                else if (hpPercent <= 0.50f) totalHeal *= 1.25f; 
+
+                // 4. Threshold Caps (35, 50, or 60 HP)
+                int currentCap = 35;
+                if (hpPercent <= 0.10f) currentCap = 60;
+                else if (hpPercent <= 0.50f) currentCap = 50;
+
+                int finalHeal = Mathf.RoundToInt(Mathf.Min(totalHeal, currentCap));
+
+                playerTarget.Heal(finalHeal);
+                
+                // 5. Activate the 2-turn lockout
+                healDrawLockoutTurns = 2; 
+                NotificationManager.instance.ShowMessage($"Healed for {finalHeal} HP!");
             }
 
             currentInk -= costOfSpell;
@@ -323,7 +347,8 @@ public class WordManager : MonoBehaviour
         }
 
         // PATCH: Reduce discard cooldown
-        if (discardCooldownTurns > 0) discardCooldownTurns--;
+        if (discardCooldownTurns > 0) discardCooldownTurns--; 
+        if (healDrawLockoutTurns > 0) healDrawLockoutTurns--;
         UpdateDiscardUI();
 
         // PATCH 9: Start the timer for the NEXT turn immediately

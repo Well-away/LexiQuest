@@ -57,7 +57,20 @@ public class CardInteraction : MonoBehaviour
         {
             foreach (Transform child in transform.parent)
             {
+                // Check if a Revitalize card already exists in hand
+                CardInteraction existingCard = child.GetComponent<CardInteraction>();
+                if (existingCard != null && existingCard != this && existingCard.currentSpell == "Revitalize")
+                {
+                    allAvailableSpells.Remove("Revitalize"); // Remove from pool for this specific draw
+                }
+
+                // Existing logic for counting other spells
+                // This part should remain after the Revitalize check
                 CardInteraction card = child.GetComponent<CardInteraction>();
+                if (card != null && card != this && card.currentSpell == "Revitalize")
+                {
+                    allAvailableSpells.Remove("Revitalize"); // PATCH 6: Never have duplicates
+                }
                 if (card != null && card != this && !string.IsNullOrEmpty(card.currentSpell))
                 {
                     if (spellCounts.ContainsKey(card.currentSpell))
