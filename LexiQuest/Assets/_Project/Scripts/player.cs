@@ -51,26 +51,22 @@ public class player : MonoBehaviour
 
     public void ApplyBubbleShield(int incomingAmount)
     {
-        // 1. Determine the cap based on current HP percentage (50% threshold)
-        float capPercent = (currentHealth < maxHealth * 0.5f) ? 0.35f : 0.20f;
-        int maxShieldCap = Mathf.RoundToInt(maxHealth * capPercent);
+        // PATCH 1: Static 50 HP Cap
+        int maxShieldCap = 50; 
 
-        // 2. Decide how to handle the incoming shield
         if (incomingAmount > currentShield)
         {
-            // Greater shield fully replaces
             currentShield = incomingAmount;
             NotificationManager.instance.ShowMessage($"Greater Shield Cast! {currentShield} HP!");
         }
         else
         {
-            // Lesser shield adds 20% of its value to the current one
             int bonus = Mathf.RoundToInt(incomingAmount * 0.20f);
             currentShield += bonus;
             NotificationManager.instance.ShowMessage($"Shield Fortified! +{bonus} HP");
         }
 
-        // 3. Enforce the final hard cap
+        // Enforce the 50 HP cap
         if (currentShield > maxShieldCap)
         {
             currentShield = maxShieldCap;

@@ -25,6 +25,7 @@ public class WordManager : MonoBehaviour
     public int maxHandSize = 5;
     // PATCH: Excluded X, Q, V, Z from the pool!
     private string allowedAlphabet = "ABCDEFGHIJKLMNOPRSTUWY";
+    public List<string> allowedSpells = new List<string> { "Fireball", "Ice Shards", "Wind Blades", "Bubble Shield", "Revitalize" };
 
     [Header("Ink System")]
     public int maxInk = 15;
@@ -49,7 +50,7 @@ public class WordManager : MonoBehaviour
 
     [Header("Discard & Shuffle System")]
     public int discardCooldownTurns = 0;
-    private int healDrawLockoutTurns = 0; // Tracks the 2-turn draw penalty
+    public int healDrawLockoutTurns = 0; // Tracks the 2-turn draw penalty
     private bool shouldDoubleDrawNextTurn = false;
     public TextMeshProUGUI discardCooldownTextUI;
 
@@ -259,7 +260,7 @@ public class WordManager : MonoBehaviour
         }
     }
 
-    public void DrawNewCard()
+    private char GetRandomLetter()
     {
         List<char> availableLetters = new List<char>(allowedAlphabet.ToCharArray());
 
@@ -277,7 +278,52 @@ public class WordManager : MonoBehaviour
             availableLetters = new List<char>(allowedAlphabet.ToCharArray());
         }
 
-        char chosenLetter = availableLetters[Random.Range(0, availableLetters.Count)];
+        return availableLetters[Random.Range(0, availableLetters.Count)];
+    }
+
+    public void DrawNewCard(bool isFromDiscard = false)
+    {
+        if (handContainer.childCount >= maxHandSize) return;
+
+        List<string> pool = new List<string>(allowedSpells);
+        
+        // Check what is currently in Amy's hand to prevent duplicates
+        bool hasShieldInHand = false;
+        bool hasHealInHand = false;
+        foreach (Transform child in handContainer)
+        {
+            string cardSpell = child.GetComponent<CardInteraction>().currentSpell;
+            if (cardSpell == "Bubble Shield") hasShieldInHand = true;
+            if (cardSpell == "Revitalize") hasHealInHand = true;
+        }
+
+        string selectedSpell = "";
+
+        // PATCH 2: Ensure Bubble Shield is always present if missing
+        if (!hasShieldInHand) 
+        {
+            selectedSpell = "Bubble Shield";
+        }
+        // PATCH 3 & 4: Emergency Revitalize Logic
+        else
+        {
+            float hpPercent = (float)playerTarget.currentHealth / playerTarget.maxHealth;
+            bool emergencyHP = hpPercent < 0.50f;
+            
+            // 1/4 Chance on Discard to bypass cooldown
+            bool discardLuck = isFromDiscard && (Random.Range(0, 4) == 0); 
+
+            if (!hasHealInHand && (emergencyHP || discardLuck || healDrawLockoutTurns <= 0))
+            {
+                selectedSpell = "Revitalize";
+            }
+            else
+            {
+                // Draw a random offensive spell (Duplicates allowed for offense)
+                List<string> offensivePool = pool.Where(s => s != "Bubble Shield" && s != "Revitalize").ToList();
+                selectedSpell = offensivePool[Random.Range(0, offensivePool.Count)];
+            }
+        }
 
         GameObject newCard = Instantiate(cardPrefab, handContainer, false);
         newCard.transform.localScale = Vector3.one;
@@ -287,7 +333,7 @@ public class WordManager : MonoBehaviour
         newCardScript.wordInputField = this.wordInputField;
         newCardScript.spellInputPanel = this.spellInputPanel;
 
-        newCardScript.InitializeCardData(chosenLetter);
+        newCardScript.InitializeCardData(GetRandomLetter(), selectedSpell);
     }
 
     public void EndTurn()
@@ -322,28 +368,25 @@ public class WordManager : MonoBehaviour
         if (currentInk > maxInk) currentInk = maxInk;
         UpdateInkUI();
 
-        int cardsToDraw = 0;
+        // PATCH: Dynamic Draw based on 30% HP Threshold
+        float hpPercent = (float)playerTarget.currentHealth / playerTarget.maxHealth;
+        
+        // Determine how many cards to draw
+        int cardsToDraw = (hpPercent <= 0.50f) ? 2 : 1;
 
-        if (survivingCards <= 1) cardsToDraw = 2;
-        else cardsToDraw = 1;
-
-        // PATCH: Double Draw Mechanic Check
-        if (shouldDoubleDrawNextTurn)
-        {
-            cardsToDraw *= 2;
-            shouldDoubleDrawNextTurn = false;
-            Debug.Log("<color=cyan>Double Draw Active!</color>");
-            NotificationManager.instance.ShowMessage("Double Draw Activated!");
-        }
-
-        if (survivingCards + cardsToDraw > maxHandSize)
-        {
-            cardsToDraw = maxHandSize - survivingCards;
-        }
-
+        // Execute the draw
         for (int i = 0; i < cardsToDraw; i++)
         {
-            DrawNewCard();
+            if (handContainer.childCount < maxHandSize)
+            {
+                DrawNewCard();
+            }
+        }
+
+        // Notify the player of the adrenaline boost
+        if (hpPercent <= 0.30f)
+        {
+            NotificationManager.instance.ShowMessage("Adrenaline! Drawing 2 Cards!");
         }
 
         // PATCH: Reduce discard cooldown
@@ -379,10 +422,12 @@ public class WordManager : MonoBehaviour
 
             NotificationManager.instance.ShowMessage($"Discarded! +{refund} Ink & Drawing New Card...");
 
-            // PATCH 8: Draw a new card immediately to replace the discarded one
-            DrawNewCard();
+            // PATCH 4: Pass 'true' to trigger the 1/4 chance for Revitalize
+            DrawNewCard(true);
 
-            discardCooldownTurns = 2;
+            // PATCH 3: Cooldown reduced to 1 turn
+            discardCooldownTurns = 1;
+            healDrawLockoutTurns = 1;
             UpdateDiscardUI();
 
             Destroy(cardToDiscard.gameObject);

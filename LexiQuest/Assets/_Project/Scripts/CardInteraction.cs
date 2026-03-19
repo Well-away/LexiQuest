@@ -39,7 +39,7 @@ public class CardInteraction : MonoBehaviour
         cardCanvas = GetComponent<Canvas>();
     }
 
-    public void InitializeCardData(char assignedLetter)
+    public void InitializeCardData(char assignedLetter, string assignedSpell = "")
     {
         currentLetter = assignedLetter;
         if (letterTextUI != null) letterTextUI.text = currentLetter.ToString();
@@ -47,55 +47,80 @@ public class CardInteraction : MonoBehaviour
         List<string> offensiveSpells = new List<string> { "Fireball", "Ice Shards", "Wind Blades" };
         List<string> nonOffensiveSpells = new List<string> { "Bubble Shield", "Revitalize" };
 
-        List<string> allAvailableSpells = new List<string>();
-        allAvailableSpells.AddRange(offensiveSpells);
-        allAvailableSpells.AddRange(nonOffensiveSpells);
-
-        Dictionary<string, int> spellCounts = new Dictionary<string, int>();
-
-        if (transform.parent != null)
+        if (!string.IsNullOrEmpty(assignedSpell))
         {
-            foreach (Transform child in transform.parent)
-            {
-                // Check if a Revitalize card already exists in hand
-                CardInteraction existingCard = child.GetComponent<CardInteraction>();
-                if (existingCard != null && existingCard != this && existingCard.currentSpell == "Revitalize")
-                {
-                    allAvailableSpells.Remove("Revitalize"); // Remove from pool for this specific draw
-                }
+            currentSpell = assignedSpell;
+        }
+        else
+        {
+            List<string> potentialSpellsToDraw = new List<string>();
+            potentialSpellsToDraw.AddRange(offensiveSpells); // Always include offensive spells
 
-                // Existing logic for counting other spells
-                // This part should remain after the Revitalize check
-                CardInteraction card = child.GetComponent<CardInteraction>();
-                if (card != null && card != this && card.currentSpell == "Revitalize")
+            // Track spells currently in hand and their counts
+            Dictionary<string, int> currentHandSpellCounts = new Dictionary<string, int>();
+            bool revitalizeAlreadyInHand = false;
+
+            if (transform.parent != null)
+            {
+                foreach (Transform child in transform.parent)
                 {
-                    allAvailableSpells.Remove("Revitalize"); // PATCH 6: Never have duplicates
-                }
-                if (card != null && card != this && !string.IsNullOrEmpty(card.currentSpell))
-                {
-                    if (spellCounts.ContainsKey(card.currentSpell))
-                        spellCounts[card.currentSpell]++;
-                    else
-                        spellCounts[card.currentSpell] = 1;
+                    CardInteraction cardInHand = child.GetComponent<CardInteraction>();
+                    if (cardInHand != null && cardInHand != this && !string.IsNullOrEmpty(cardInHand.currentSpell))
+                    {
+                        if (cardInHand.currentSpell == "Revitalize")
+                        {
+                            revitalizeAlreadyInHand = true;
+                        }
+
+                        if (currentHandSpellCounts.ContainsKey(cardInHand.currentSpell))
+                            currentHandSpellCounts[cardInHand.currentSpell]++;
+                        else
+                            currentHandSpellCounts[cardInHand.currentSpell] = 1;
+                    }
                 }
             }
-        }
 
-        foreach (var kvp in spellCounts)
-        {
-            if (kvp.Value >= 2)
+            // Conditionally add "Revitalize" based on cooldown and if not already in hand
+            if (WordManager.instance.healDrawLockoutTurns <= 0 && !revitalizeAlreadyInHand)
             {
-                allAvailableSpells.Remove(kvp.Key);
+                potentialSpellsToDraw.Add("Revitalize");
             }
+
+            // Add other non-offensive spells (assuming Bubble Shield is unique and has no cooldown)
+            if (nonOffensiveSpells.Contains("Bubble Shield") && (!currentHandSpellCounts.ContainsKey("Bubble Shield") || currentHandSpellCounts["Bubble Shield"] == 0))
+            {
+                potentialSpellsToDraw.Add("Bubble Shield");
+            }
+
+            // Filter out spells that exceed their allowed count (e.g., more than 2 offensive spells)
+            List<string> finalAvailableSpells = new List<string>();
+            foreach (string spell in potentialSpellsToDraw)
+            {
+                int maxAllowed = 1; // Default for unique spells like Revitalize, Bubble Shield
+                if (offensiveSpells.Contains(spell))
+                {
+                    maxAllowed = 2; // Allow up to 2 offensive spells
+                }
+
+                int currentCount = currentHandSpellCounts.ContainsKey(spell) ? currentHandSpellCounts[spell] : 0;
+
+                if (currentCount < maxAllowed)
+                {
+                    finalAvailableSpells.Add(spell);
+                }
+            }
+
+            // Fallback: If no spells can be drawn due to restrictions, ensure at least one offensive spell is drawn.
+            if (finalAvailableSpells.Count == 0)
+            {
+                // This ensures the player always draws a card, even if it's a duplicate offensive spell.
+                // This is a design choice to prevent an empty draw pool.
+                finalAvailableSpells.Add(offensiveSpells[UnityEngine.Random.Range(0, offensiveSpells.Count)]);
+            }
+
+            currentSpell = finalAvailableSpells[UnityEngine.Random.Range(0, finalAvailableSpells.Count)];
         }
 
-        if (allAvailableSpells.Count == 0)
-        {
-            allAvailableSpells.AddRange(offensiveSpells);
-            allAvailableSpells.AddRange(nonOffensiveSpells);
-        }
-
-        currentSpell = allAvailableSpells[Random.Range(0, allAvailableSpells.Count)];
         if (spellNameTextUI != null) spellNameTextUI.text = currentSpell;
 
         if (offensiveSpells.Contains(currentSpell))
