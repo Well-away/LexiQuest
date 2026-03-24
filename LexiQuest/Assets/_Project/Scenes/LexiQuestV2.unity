@@ -1887,6 +1887,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleManager
   wordInputField: {fileID: 1473737094}
   currentState: 0
+  currentTurn: 1
   introBanner: {fileID: 1794332703}
   categoryPanel: {fileID: 1896685626}
   spellPanel: {fileID: 1683317471}
@@ -1905,6 +1906,7 @@ MonoBehaviour:
   maxTypingTime: 60
   maxOvertime: 30
   maxPenaltyPercent: 0.3
+  isLesserSpell: 0
 --- !u!4 &977012513
 Transform:
   m_ObjectHideFlags: 0
@@ -2263,9 +2265,9 @@ MonoBehaviour:
   m_fontSize: 30
   m_fontSizeBase: 30
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMax: 30
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -2955,9 +2957,9 @@ MonoBehaviour:
   m_fontSize: 35
   m_fontSizeBase: 35
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMax: 35
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
