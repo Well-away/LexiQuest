@@ -482,13 +482,13 @@ public class BattleManager : MonoBehaviour
         else
         {
             bannerText.text = "SPELL CAST!";
-            bannerText.color = Color.white; 
+            bannerText.color = Color.black; // <--- CHANGE TO BLACK
         }
         
         yield return StartCoroutine(WaitOrSkip(2f)); 
 
         introBanner.SetActive(false);
-        bannerText.color = Color.white; // Reset color for next time
+        bannerText.color = Color.black; // <--- CHANGE TO BLACK (Reset for next time)
         
         Debug.Log("Turn Ended. Golem's Turn!");
         ChangeState(BattleState.EnemyTurn);
