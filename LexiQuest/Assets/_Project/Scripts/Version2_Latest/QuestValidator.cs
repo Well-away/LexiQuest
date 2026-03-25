@@ -19,11 +19,6 @@ public static class QuestValidator
             case Tier2Type.MinLength_6: return len >= 6;
             case Tier2Type.MinLength_7: return len >= 7;
             case Tier2Type.MinLength_8: return len >= 8;
-            case Tier2Type.MaxLength_5: return len <= 5;
-            case Tier2Type.MaxLength_6: return len <= 6;
-            case Tier2Type.MaxLength_7: return len <= 7;
-            case Tier2Type.EvenLength: return len > 0 && len % 2 == 0;
-            case Tier2Type.OddLength: return len > 0 && len % 2 != 0;
             
             // --- SUFFIXES ---
             case Tier2Type.EndsWith_S: return word.EndsWith("S");
@@ -37,18 +32,6 @@ public static class QuestValidator
             case Tier2Type.EndsWith_E: return word.EndsWith("E");
             case Tier2Type.EndsWith_TION: return word.EndsWith("TION");
             
-            // --- INCLUSIONS ---
-            case Tier2Type.Contains_DoubleLetter: 
-                return Regex.IsMatch(word, @"(.)\1"); 
-            case Tier2Type.Contains_TH: return word.Contains("TH");
-            case Tier2Type.Contains_CH: return word.Contains("CH");
-            case Tier2Type.Contains_SH: return word.Contains("SH");
-            case Tier2Type.Contains_ST: return word.Contains("ST");
-            case Tier2Type.Contains_CK: return word.Contains("CK");
-            case Tier2Type.Contains_EA: return word.Contains("EA");
-            case Tier2Type.Contains_EE: return word.Contains("EE");
-            case Tier2Type.Contains_OO: return word.Contains("OO");
-            case Tier2Type.Contains_OU: return word.Contains("OU");
             
             // --- EXCLUSIONS ---
             case Tier2Type.No_Letter_A: return !word.Contains("A");

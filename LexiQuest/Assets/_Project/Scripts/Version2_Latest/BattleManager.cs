@@ -14,6 +14,7 @@ public class BattleManager : MonoBehaviour
     private float currentTypingTimer;
     public BattleState currentState;
     private bool isBannerSkipped = false;
+    private bool isSubmitLocked = false;
 
     [Header("Battle State")]
     public int currentTurn = 1;
@@ -51,7 +52,7 @@ public class BattleManager : MonoBehaviour
     private float currentOvertime;
 
     [Header("Spam Filter")]
-    private string lastSuccessfulWord = "";
+    private List<string> recentWords = new List<string>();
 
     [Header("Ultimate Mechanics")]
     private int previousInputLength = 0;
@@ -65,6 +66,18 @@ public class BattleManager : MonoBehaviour
     {
         // Start the sequence!
         ChangeState(BattleState.Intro);
+    }
+
+    void Update()
+    {
+        // Allow pressing Enter to cast the spell quickly!
+        if (currentState == BattleState.Typing)
+        {
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                SubmitWord();
+            }
+        }
     }
 
     public void ChangeState(BattleState newState)
@@ -207,13 +220,22 @@ public class BattleManager : MonoBehaviour
         // Only show Tier 3 UI if it's an Ultimate Boss Turn
         if (currentQuest.tier3Rule != Tier3Type.None)
         {
+            tier3StatusText.transform.parent.gameObject.SetActive(true); // Tries to turn on the background box
             tier3StatusText.gameObject.SetActive(true);
             tier3StatusText.text = currentQuest.tier3Description;
-            tier3StatusText.color = Color.cyan; // Make it pop!
+            tier3StatusText.color = Color.black; 
         }
         else
         {
+            // Failsafe: Turn off the object, turn off its parent box, AND erase the text!
+            tier3StatusText.text = ""; 
             tier3StatusText.gameObject.SetActive(false);
+            
+            // If the text is inside a white panel, this turns off the panel too:
+            if (tier3StatusText.transform.parent != null)
+            {
+                tier3StatusText.transform.parent.gameObject.SetActive(false);
+            }
         }
 
         introBanner.SetActive(false);
@@ -238,6 +260,14 @@ public class BattleManager : MonoBehaviour
         previousInputLength = 0; // Reset Flawless tracker
         isWaitingForSecondWord = false; // <--- ADD THIS
         firstDoubleCastWord = "";       // <--- ADD THIS
+        isSubmitLocked = false;
+
+        // --- TIER 3 UI FAILSAFE ---
+        // Force the Boss text to hide if we are on a normal turn
+        if (currentQuest.tier3Rule == Tier3Type.None)
+        {
+            tier3StatusText.gameObject.SetActive(false);
+        }
 
         // --- ULTIMATE MECHANIC: BLIND CASTING ---
         if (currentQuest.tier3Rule == Tier3Type.BlindCasting)
@@ -268,7 +298,7 @@ public class BattleManager : MonoBehaviour
             Debug.Log("<color=red>SPEED CASTING ACTIVE! 10 Seconds Only!</color>");
         }
 
-        float currentTypingTimer = startingTime;
+        currentTypingTimer = startingTime; // Use the class-level variable
 
         // PHASE 1: The Countdown
         while (currentTypingTimer > 0 && currentState == BattleState.Typing)
@@ -325,11 +355,18 @@ public class BattleManager : MonoBehaviour
     // This is called when the player clicks the "Cast Spell" button
     public void SubmitWord()
     {
-        if (currentState != BattleState.Typing) return;
+        if (currentState != BattleState.Typing || isSubmitLocked) return;
+        isSubmitLocked = true; // Lock the button immediately!
 
-        // Get the single word they typed
-        string playerWord = wordInputField.text.ToUpper().Trim();
-        if (string.IsNullOrEmpty(playerWord)) return;
+        // Get the single word, make it uppercase, and remove ALL spaces and non-letter characters
+        string rawInput = wordInputField.text.ToUpper();
+        string playerWord = System.Text.RegularExpressions.Regex.Replace(rawInput, @"[^A-Z]", "");
+        
+        if (string.IsNullOrEmpty(playerWord))
+        {
+            isSubmitLocked = false;
+            return;
+        }
 
         // --- POTENCY CALCULATION (Applies to all casts) ---
         float finalPotency = 1.0f;
@@ -349,17 +386,30 @@ public class BattleManager : MonoBehaviour
             if (!isWaitingForSecondWord)
             {
                 // --- PART 1: VALIDATE THE FIRST WORD ---
-                if (playerWord == lastSuccessfulWord)
+                if (recentWords.Contains(playerWord))
                 {
-                    Debug.Log($"<color=red>Spam Filter: You used '{playerWord}' last turn!</color>");
+                    Debug.Log($"<color=red>Spam Filter: You used '{playerWord}' recently!</color>");
                     wordInputField.textComponent.color = Color.red; 
+                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+                    {
+                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                        wordInputField.ForceLabelUpdate();
+                    }
+                    isSubmitLocked = false;
                     return;
                 }
 
-                if (!playerWord.StartsWith(currentQuest.targetLetter.ToString()))
+                if (!playerWord.StartsWith(currentQuest.targetLetter))
+                if (!playerWord.StartsWith(currentQuest.targetLetter))
                 {
                     Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
                     wordInputField.textComponent.color = Color.red;
+                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+                    {
+                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                        wordInputField.ForceLabelUpdate();
+                    }
+                    isSubmitLocked = false;
                     return;
                 }
 
@@ -367,6 +417,11 @@ public class BattleManager : MonoBehaviour
                 if (t2Passed)
                 {
                     Debug.Log("<color=cyan>First word accepted! Waiting for second word...</color>");
+                    
+                    // Reward them with time for getting the first word!
+                    currentTypingTimer += 15f; 
+                    if (currentTypingTimer > maxTypingTime) currentTypingTimer = maxTypingTime; // Cap it so it doesn't overflow
+                    Debug.Log("<color=green>+15 Seconds added to the clock!</color>");
                     
                     // Save the first word and change state
                     firstDoubleCastWord = playerWord;
@@ -379,11 +434,18 @@ public class BattleManager : MonoBehaviour
                     
                     // Refocus the input field so they don't have to click it again
                     wordInputField.ActivateInputField(); 
+                    isSubmitLocked = false; // Unlock so they can submit the second word!
                 }
                 else
                 {
                     Debug.Log("<color=orange>Word failed the Shape/Rule requirement.</color>");
                     wordInputField.textComponent.color = Color.red;
+                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+                    {
+                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                        wordInputField.ForceLabelUpdate();
+                    }
+                    isSubmitLocked = false;
                 }
                 
                 return; // Stop here! Do not end the turn! Let the timer keep ticking!
@@ -393,10 +455,16 @@ public class BattleManager : MonoBehaviour
                 // --- PART 2: VALIDATE THE SECOND WORD ---
                 
                 // Anti-Cheese check: They cannot use the exact same word they just used for Part 1!
-                if (playerWord == lastSuccessfulWord || playerWord == firstDoubleCastWord)
+                if (recentWords.Contains(playerWord) || playerWord == firstDoubleCastWord)
                 {
-                    Debug.Log("<color=red>Spam Filter: Cannot use last turn's word OR your first combo word again!</color>");
+                    Debug.Log("<color=red>Spam Filter: Cannot use a recent word OR your first combo word again!</color>");
                     wordInputField.textComponent.color = Color.red; 
+                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+                    {
+                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                        wordInputField.ForceLabelUpdate();
+                    }
+                    isSubmitLocked = false;
                     return;
                 }
 
@@ -404,6 +472,12 @@ public class BattleManager : MonoBehaviour
                 {
                     Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
                     wordInputField.textComponent.color = Color.red;
+                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+                    {
+                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                        wordInputField.ForceLabelUpdate();
+                    }
+                    isSubmitLocked = false;
                     return;
                 }
 
@@ -413,7 +487,7 @@ public class BattleManager : MonoBehaviour
                     Debug.Log($"<color=cyan>DOUBLE CAST SUCCESS! Ultimate Spell Activated at {(finalPotency * 100).ToString("F1")}% Power!</color>");
                     
                     // Save ONLY the second word for the next turn's spam filter
-                    lastSuccessfulWord = playerWord; 
+                    RecordSuccessfulWord(playerWord); 
                     
                     // Reset variables for safety
                     isWaitingForSecondWord = false;
@@ -425,6 +499,12 @@ public class BattleManager : MonoBehaviour
                 {
                     Debug.Log("<color=orange>Second word failed the Shape/Rule requirement.</color>");
                     wordInputField.textComponent.color = Color.red;
+                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+                    {
+                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                        wordInputField.ForceLabelUpdate();
+                    }
+                    isSubmitLocked = false;
                 }
                 
                 return; // Stop here so it doesn't run the normal single-word code
@@ -434,18 +514,30 @@ public class BattleManager : MonoBehaviour
         // ==========================================
         // NORMAL CASTING (1 Word - Turns 1 to 4)
         // ==========================================
-        if (playerWord == lastSuccessfulWord)
+        if (recentWords.Contains(playerWord))
         {
-            Debug.Log($"<color=red>Spam Filter: You used '{playerWord}' last turn!</color>");
+            Debug.Log($"<color=red>Spam Filter: You used '{playerWord}' recently!</color>");
             wordInputField.textComponent.color = Color.red; 
+            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+            {
+                wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                wordInputField.ForceLabelUpdate();
+            }
+            isSubmitLocked = false;
             return; 
         }
 
         // 1. Mandatory Tier 1 Check
-        if (!playerWord.StartsWith(currentQuest.targetLetter.ToString()))
+        if (!playerWord.StartsWith(currentQuest.targetLetter))
         {
             Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
             wordInputField.textComponent.color = Color.red; 
+            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+            {
+                wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                wordInputField.ForceLabelUpdate();
+            }
+            isSubmitLocked = false;
             return; // STOP! Let them keep typing.
         }
 
@@ -455,12 +547,18 @@ public class BattleManager : MonoBehaviour
         {
             Debug.Log("<color=orange>Tier 2 Rule Failed. You must fulfill the side quest!</color>");
             wordInputField.textComponent.color = Color.red;
+            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+            {
+                wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                wordInputField.ForceLabelUpdate();
+            }
+            isSubmitLocked = false;
             return; // STOP! Let them keep typing.
         }
 
         // 3. SUCCESS! Both tiers passed.
         Debug.Log($"<color=green>Spell Activated at {(finalPotency * 100).ToString("F1")}% Power.</color>");
-        lastSuccessfulWord = playerWord;
+        RecordSuccessfulWord(playerWord);
         
         isLesserSpell = false; // Normal spell achieved!
         ChangeState(BattleState.Resolution);
@@ -585,7 +683,7 @@ public class BattleManager : MonoBehaviour
         // 2. Check what the game *thinks* it's comparing
         Debug.Log("Comparing '" + upperInput + "' against Target Letter '" + currentQuest.targetLetter + "'");
 
-        if (upperInput.StartsWith(currentQuest.targetLetter.ToString()))
+        if (upperInput.StartsWith(currentQuest.targetLetter))
         {
             wordInputField.textComponent.color = Color.black; 
             Debug.Log("Match! Color should be Black.");
@@ -610,5 +708,16 @@ public class BattleManager : MonoBehaviour
         }
         
         isBannerSkipped = false; // Reset it again for the next banner!
+    }
+
+    private void RecordSuccessfulWord(string word)
+    {
+        recentWords.Add(word);
+        
+        // If the list gets larger than 5, delete the oldest word (index 0)
+        if (recentWords.Count > 5)
+        {
+            recentWords.RemoveAt(0);
+        }
     }
 }

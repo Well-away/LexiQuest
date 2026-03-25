@@ -2,23 +2,16 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
-// THE MASTER CONDITION LIST (46 Rules)
+// THE MASTER CONDITION LIST (Cleaned up! No more 2-letter inclusions)
 public enum Tier2Type 
 { 
     // Shapes & Sizes
     ExactLength_4, ExactLength_5, ExactLength_6, ExactLength_7, ExactLength_8,
     MinLength_5, MinLength_6, MinLength_7, MinLength_8,
-    MaxLength_5, MaxLength_6, MaxLength_7,
-    EvenLength, OddLength,
     
     // Suffixes
     EndsWith_S, EndsWith_ED, EndsWith_ER, EndsWith_ING, EndsWith_LY, 
     EndsWith_Y, EndsWith_T, EndsWith_N, EndsWith_E, EndsWith_TION,
-    
-    // Inclusions
-    Contains_DoubleLetter, 
-    Contains_TH, Contains_CH, Contains_SH, Contains_ST, Contains_CK,
-    Contains_EA, Contains_EE, Contains_OO, Contains_OU,
     
     // Exclusions
     No_Letter_A, No_Letter_E, No_Letter_I, No_Letter_O, No_Letter_U,
@@ -38,7 +31,7 @@ public enum Tier3Type
 
 public class QuestData
 {
-    public char targetLetter;
+    public string targetLetter; // <--- UPGRADED TO STRING
     public int targetLength; // Only used if Tier 2 is an Exact Length
     public Tier2Type tier2Rule;
     public Tier3Type tier3Rule;
@@ -49,26 +42,27 @@ public class QuestData
 
 public class QuestManager : MonoBehaviour
 {
-    private List<char> group1 = new List<char> { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K' };
-    private List<char> group2 = new List<char> { 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'W', 'Y' }; // Excludes Q, V, X, Z
+    // Upgraded to strings! Added the Consonant Clusters to Group 2 to make it harder!
+    private List<string> group1 = new List<string> { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K" };
+    private List<string> group2 = new List<string> { "L", "M", "N", "O", "P", "R", "S", "T", "U", "W", "Y", "SH", "CH", "TH", "ST" }; 
     
-    private List<char> currentActiveGroup;
-    private List<char> remainingLetters;
+    private List<string> currentActiveGroup;
+    private List<string> remainingLetters;
 
     void Awake()
     {
         // Initialize with Group 1
-        currentActiveGroup = new List<char>(group1);
+        currentActiveGroup = new List<string>(group1);
         ResetRotation();
     }
 
     private void ResetRotation()
     {
-        remainingLetters = new List<char>(currentActiveGroup);
-        // Shuffle the letters so they aren't in alphabetical order
+        remainingLetters = new List<string>(currentActiveGroup);
+        // Shuffle the prefixes so they aren't in alphabetical order
         for (int i = 0; i < remainingLetters.Count; i++)
         {
-            char temp = remainingLetters[i];
+            string temp = remainingLetters[i];
             int randomIndex = Random.Range(i, remainingLetters.Count);
             remainingLetters[i] = remainingLetters[randomIndex];
             remainingLetters[randomIndex] = temp;
@@ -79,7 +73,7 @@ public class QuestManager : MonoBehaviour
     {
         QuestData newQuest = new QuestData();
 
-        // 1. TIER 1: Letter Rotation
+        // 1. TIER 1: Prefix Rotation
         if (remainingLetters.Count == 0)
         {
             // Swap Groups
@@ -92,60 +86,70 @@ public class QuestManager : MonoBehaviour
         remainingLetters.RemoveAt(0);
         newQuest.tier1Description = "Word starting with '" + newQuest.targetLetter + "'";
 
-        // --- 2. TIER 2: The Single Condition (Massive Expanded List) ---
+        // --- 2. TIER 2: The Optimized Lexical List (No mid-word inclusions) ---
         Tier2Type[] easyQuests = { 
-            Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.MaxLength_5, Tier2Type.EvenLength, Tier2Type.OddLength,
-            Tier2Type.EndsWith_S, Tier2Type.EndsWith_T, Tier2Type.EndsWith_E, 
+            Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.MinLength_5,
+            Tier2Type.EndsWith_S, Tier2Type.EndsWith_T, Tier2Type.EndsWith_E, Tier2Type.EndsWith_Y,
             Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_L
         };
         
         Tier2Type[] mediumQuests = { 
-            Tier2Type.ExactLength_6, Tier2Type.MinLength_6, Tier2Type.MaxLength_6,
-            Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER, Tier2Type.EndsWith_Y, Tier2Type.EndsWith_N,
-            Tier2Type.Contains_DoubleLetter, Tier2Type.Contains_TH, Tier2Type.Contains_CH, Tier2Type.Contains_SH, Tier2Type.Contains_ST, Tier2Type.Contains_CK,
-            Tier2Type.Contains_EA, Tier2Type.Contains_EE, Tier2Type.Contains_OO,
+            Tier2Type.ExactLength_6, Tier2Type.MinLength_6, 
+            Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER, Tier2Type.EndsWith_ING, Tier2Type.EndsWith_N,
             Tier2Type.No_Letter_A, Tier2Type.No_Letter_I, Tier2Type.No_Letter_O, Tier2Type.No_Letter_U
         };
         
         Tier2Type[] hardQuests = { 
-            Tier2Type.MinLength_7, Tier2Type.MinLength_8, Tier2Type.ExactLength_7, Tier2Type.ExactLength_8, Tier2Type.MaxLength_7,
-            Tier2Type.EndsWith_ING, Tier2Type.EndsWith_LY, Tier2Type.EndsWith_TION,
-            Tier2Type.Contains_OU, Tier2Type.No_Letter_E, Tier2Type.No_Letter_T, Tier2Type.No_Letter_S, Tier2Type.No_Letter_R, Tier2Type.No_Letter_N
+            Tier2Type.ExactLength_7, Tier2Type.ExactLength_8, Tier2Type.MinLength_7, Tier2Type.MinLength_8,
+            Tier2Type.EndsWith_LY, Tier2Type.EndsWith_TION,
+            Tier2Type.No_Letter_E, Tier2Type.No_Letter_T, Tier2Type.No_Letter_S, Tier2Type.No_Letter_R, Tier2Type.No_Letter_N
         };
 
         int roll = Random.Range(1, 101); 
+        
+        // Ensure tricky letters or multi-letter clusters don't get impossible rules
+        bool isTrickyLetter = new[] { "J", "K", "W", "Y", "SH", "CH", "TH" }.Contains(newQuest.targetLetter);
 
-        // Dynamic Escalation (Turn 5 is excluded because it's a Boss Turn!)
-        if (currentTurn <= 2)
+        // We use a do-while loop to reroll if the game accidentally bans our starting letter or hits a linguistic void!
+        do 
         {
-            newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
-        }
-        else if (currentTurn <= 4) // Turns 3 and 4
-        {
-            if (roll <= 70) newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
-            else newQuest.tier2Rule = mediumQuests[Random.Range(0, mediumQuests.Length)];
-        }
-        else // Turns 6, 7, 8, 9, 11...
-        {
-            // Phase 3: 35% Easy, 35% Medium, 30% Hard
-            if (roll <= 35) newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
-            else if (roll <= 70) newQuest.tier2Rule = mediumQuests[Random.Range(0, mediumQuests.Length)];
-            else newQuest.tier2Rule = hardQuests[Random.Range(0, hardQuests.Length)];
-        }
+            // LOOPHOLE PATCH: Force Easy Quests for Tricky Letters/Clusters
+            if (isTrickyLetter)
+            {
+                newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
+            }
+            // Normal Dynamic Escalation
+            else if (currentTurn <= 2)
+            {
+                newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
+            }
+            else if (currentTurn <= 4) // Turns 3 and 4
+            {
+                if (roll <= 70) newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
+                else newQuest.tier2Rule = mediumQuests[Random.Range(0, mediumQuests.Length)];
+            }
+            else // Phase 3 (Turns 6+)
+            {
+                if (roll <= 35) newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
+                else if (roll <= 70) newQuest.tier2Rule = mediumQuests[Random.Range(0, mediumQuests.Length)];
+                else newQuest.tier2Rule = hardQuests[Random.Range(0, hardQuests.Length)];
+            }
+        } while (newQuest.tier2Rule.ToString() == "No_Letter_" + newQuest.targetLetter || IsUnfairCombo(newQuest.targetLetter, newQuest.tier2Rule));
 
         // --- 3. TIER 3: The Build-Up Feature (Ultimate Boss Turn) ---
-        // The modulo operator (%) checks if the turn is perfectly divisible by 5.
         if (currentTurn > 0 && currentTurn % 5 == 0)
-        //if (true)
         {
             Debug.Log("<color=cyan>TURN 5 REACHED: BOSS MECHANIC TRIGGERED!</color>");
             
-            // Randomly pick one of the 4 Ultimate mechanics
             Tier3Type[] bossMechanics = { Tier3Type.FlawlessCasting, Tier3Type.SpeedCasting, Tier3Type.DoubleCast, Tier3Type.BlindCasting };
             newQuest.tier3Rule = bossMechanics[Random.Range(0, bossMechanics.Length)];
             
-            // Force a medium/hard base word to go with the Ultimate mechanic
-            newQuest.tier2Rule = mediumQuests[Random.Range(0, mediumQuests.Length)];
+            // Force a medium/hard base word, but REROLL if it clashes with our prefix!
+            do 
+            {
+                if (isTrickyLetter) newQuest.tier2Rule = easyQuests[Random.Range(0, easyQuests.Length)];
+                else newQuest.tier2Rule = mediumQuests[Random.Range(0, mediumQuests.Length)];
+            } while (newQuest.tier2Rule.ToString() == "No_Letter_" + newQuest.targetLetter || IsUnfairCombo(newQuest.targetLetter, newQuest.tier2Rule));
             
             switch (newQuest.tier3Rule)
             {
@@ -157,12 +161,11 @@ public class QuestManager : MonoBehaviour
         }
         else
         {
-            // Normal turn. No Tier 3 Mechanic.
             newQuest.tier3Rule = Tier3Type.None;
             newQuest.tier3Description = "";
         }
 
-        // Translate the massive Enum list to readable text for the UI
+        // Translate the cleaned-up Enum list to readable text for the UI
         switch (newQuest.tier2Rule)
         {
             case Tier2Type.ExactLength_4: newQuest.tier2Description = "Exactly 4 letters"; break;
@@ -174,11 +177,6 @@ public class QuestManager : MonoBehaviour
             case Tier2Type.MinLength_6: newQuest.tier2Description = "6 or more letters"; break;
             case Tier2Type.MinLength_7: newQuest.tier2Description = "7 or more letters"; break;
             case Tier2Type.MinLength_8: newQuest.tier2Description = "8 or more letters"; break;
-            case Tier2Type.MaxLength_5: newQuest.tier2Description = "5 or fewer letters"; break;
-            case Tier2Type.MaxLength_6: newQuest.tier2Description = "6 or fewer letters"; break;
-            case Tier2Type.MaxLength_7: newQuest.tier2Description = "7 or fewer letters"; break;
-            case Tier2Type.EvenLength: newQuest.tier2Description = "Even number of letters"; break;
-            case Tier2Type.OddLength: newQuest.tier2Description = "Odd number of letters"; break;
             
             case Tier2Type.EndsWith_S: newQuest.tier2Description = "Ends in -S or -ES"; break;
             case Tier2Type.EndsWith_ED: newQuest.tier2Description = "Ends in -D or -ED"; break;
@@ -190,17 +188,6 @@ public class QuestManager : MonoBehaviour
             case Tier2Type.EndsWith_N: newQuest.tier2Description = "Ends in -N"; break;
             case Tier2Type.EndsWith_E: newQuest.tier2Description = "Ends in -E"; break;
             case Tier2Type.EndsWith_TION: newQuest.tier2Description = "Ends in -TION"; break;
-
-            case Tier2Type.Contains_DoubleLetter: newQuest.tier2Description = "Contains a double letter"; break;
-            case Tier2Type.Contains_TH: newQuest.tier2Description = "Contains 'TH'"; break;
-            case Tier2Type.Contains_CH: newQuest.tier2Description = "Contains 'CH'"; break;
-            case Tier2Type.Contains_SH: newQuest.tier2Description = "Contains 'SH'"; break;
-            case Tier2Type.Contains_ST: newQuest.tier2Description = "Contains 'ST'"; break;
-            case Tier2Type.Contains_CK: newQuest.tier2Description = "Contains 'CK'"; break;
-            case Tier2Type.Contains_EA: newQuest.tier2Description = "Contains 'EA'"; break;
-            case Tier2Type.Contains_EE: newQuest.tier2Description = "Contains 'EE'"; break;
-            case Tier2Type.Contains_OO: newQuest.tier2Description = "Contains 'OO'"; break;
-            case Tier2Type.Contains_OU: newQuest.tier2Description = "Contains 'OU'"; break;
 
             case Tier2Type.No_Letter_A: newQuest.tier2Description = "Does NOT contain 'A'"; break;
             case Tier2Type.No_Letter_E: newQuest.tier2Description = "Does NOT contain 'E'"; break;
@@ -217,5 +204,31 @@ public class QuestManager : MonoBehaviour
         }
 
         return newQuest;
+    }
+
+    // A dictionary of mathematically unfair "Linguistic Voids"
+    private bool IsUnfairCombo(string prefix, Tier2Type rule)
+    {
+        // 1. The Double Suffix Trap: B, Y, W, K, SH, CH, and TH rarely end in 'TION'
+        if (rule == Tier2Type.EndsWith_TION)
+        {
+            if (prefix == "B" || prefix == "Y" || prefix == "W" || prefix == "K" || 
+                prefix == "SH" || prefix == "CH" || prefix == "TH") 
+                return true;
+        }
+        
+        // 2. The 'LY' Void: Vowels rarely start words that end in 'LY' (except E and U)
+        if (rule == Tier2Type.EndsWith_LY && (prefix == "I" || prefix == "O")) return true;
+
+        // 3. The 'Y' Bookend: Words starting with Y and ending with Y are incredibly rare (YUMMY, YEARLY)
+        if (rule == Tier2Type.EndsWith_Y && prefix == "Y") return true;
+
+        // --- THE CLUSTER PARADOXES ---
+        // 4. You cannot ban a letter that is already inside the required starting prefix!
+        if (rule == Tier2Type.No_Letter_S && (prefix == "SH" || prefix == "ST")) return true;
+        if (rule == Tier2Type.No_Letter_C && prefix == "CH") return true;
+        if (rule == Tier2Type.No_Letter_T && (prefix == "TH" || prefix == "ST")) return true;
+
+        return false; // If it passes all checks, the combo is fair!
     }
 }
