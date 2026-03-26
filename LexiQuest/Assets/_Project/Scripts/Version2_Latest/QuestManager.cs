@@ -43,9 +43,15 @@ public class QuestData
 public class QuestManager : MonoBehaviour
 {
     // Upgraded to strings! Added the Consonant Clusters to Group 2 to make it harder!
+    
     private List<string> group1 = new List<string> { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K" };
     private List<string> group2 = new List<string> { "L", "M", "N", "O", "P", "R", "S", "T", "U", "W", "Y", "SH", "CH", "TH", "ST" }; 
     
+    /*for testing
+    private List<string> group1 = new List<string> { "G" };
+    private List<string> group2 = new List<string> { "G" };
+    */
+
     private List<string> currentActiveGroup;
     private List<string> remainingLetters;
 

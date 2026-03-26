@@ -52,7 +52,9 @@ public class BattleManager : MonoBehaviour
     private float currentOvertime;
 
     [Header("Spam Filter")]
-    private List<string> recentWords = new List<string>();
+    // A dictionary that links a Prefix (string) to a List of used words (List<string>)
+    private Dictionary<string, List<string>> usedWordsPerPrefix = new Dictionary<string, List<string>>();
+    private int maxMemoryPerPrefix = 2; // The sweet spot!
 
     [Header("Ultimate Mechanics")]
     private int previousInputLength = 0;
@@ -212,6 +214,29 @@ public class BattleManager : MonoBehaviour
         bannerText.text = "SIDE QUEST: " + currentQuest.tier2Description;
         yield return StartCoroutine(WaitOrSkip(3f));
 
+        // ==========================================
+        // 3. NEW: THE DYNAMIC BLOCKED WORDS BANNER
+        // ==========================================
+        if (usedWordsPerPrefix.ContainsKey(currentQuest.targetLetter) && usedWordsPerPrefix[currentQuest.targetLetter].Count > 0)
+        {
+            // Find out how many words we should actually block for this specific turn
+            int currentLimit = GetDynamicMemoryLimit(currentQuest.tier2Rule);
+            List<string> history = usedWordsPerPrefix[currentQuest.targetLetter];
+            
+            // Grab only the most recent 'X' words based on the limit
+            var activelyBlockedWords = history.Skip(Mathf.Max(0, history.Count - currentLimit)).ToList();
+
+            if (activelyBlockedWords.Count > 0)
+            {
+                string blockedString = string.Join(", ", activelyBlockedWords);
+                bannerText.text = "BLOCKED: " + blockedString;
+                bannerText.color = Color.red; 
+                
+                yield return StartCoroutine(WaitOrSkip(2.5f));
+                bannerText.color = Color.black; 
+            }
+        }
+
         // 4. PREPARE TYPING UI
         // Set the persistent side-panel text so the player doesn't forget
         tier1StatusText.text = "Letter: " + currentQuest.targetLetter;
@@ -368,6 +393,24 @@ public class BattleManager : MonoBehaviour
             return;
         }
 
+        // ==========================================
+        // GLOBAL RULE: MINIMUM 3 LETTERS
+        // ==========================================
+        if (playerWord.Length < 3)
+        {
+            Debug.Log("<color=red>Failed! Spells must be at least 3 letters long.</color>");
+            wordInputField.textComponent.color = Color.red; 
+            
+            // Unmask if it's a Blind Cast
+            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+            {
+                wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                wordInputField.ForceLabelUpdate();
+            }
+            isSubmitLocked = false;
+            return; 
+        }
+
         // --- POTENCY CALCULATION (Applies to all casts) ---
         float finalPotency = 1.0f;
         if (isOvertime)
@@ -386,9 +429,20 @@ public class BattleManager : MonoBehaviour
             if (!isWaitingForSecondWord)
             {
                 // --- PART 1: VALIDATE THE FIRST WORD ---
-                if (recentWords.Contains(playerWord))
+                // Dynamic Spam Filter Check
+                bool isSpamPart1 = false;
+                if (usedWordsPerPrefix.ContainsKey(currentQuest.targetLetter))
                 {
-                    Debug.Log($"<color=red>Spam Filter: You used '{playerWord}' recently!</color>");
+                    int limit = GetDynamicMemoryLimit(currentQuest.tier2Rule);
+                    var history = usedWordsPerPrefix[currentQuest.targetLetter];
+                    var activelyBlocked = history.Skip(Mathf.Max(0, history.Count - limit)).ToList();
+                    
+                    if (activelyBlocked.Contains(playerWord)) isSpamPart1 = true;
+                }
+
+                if (isSpamPart1)
+                {
+                    Debug.Log($"<color=red>Spam Filter: '{playerWord}' is blocked for this difficulty!</color>");
                     wordInputField.textComponent.color = Color.red; 
                     if (wordInputField.contentType == TMP_InputField.ContentType.Password)
                     {
@@ -399,7 +453,6 @@ public class BattleManager : MonoBehaviour
                     return;
                 }
 
-                if (!playerWord.StartsWith(currentQuest.targetLetter))
                 if (!playerWord.StartsWith(currentQuest.targetLetter))
                 {
                     Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
@@ -453,11 +506,21 @@ public class BattleManager : MonoBehaviour
             else
             {
                 // --- PART 2: VALIDATE THE SECOND WORD ---
+                // Dynamic Spam Filter Check
+                bool isSpamPart2 = false;
+                if (usedWordsPerPrefix.ContainsKey(currentQuest.targetLetter))
+                {
+                    int limit = GetDynamicMemoryLimit(currentQuest.tier2Rule);
+                    var history = usedWordsPerPrefix[currentQuest.targetLetter];
+                    var activelyBlocked = history.Skip(Mathf.Max(0, history.Count - limit)).ToList();
+                    
+                    if (activelyBlocked.Contains(playerWord)) isSpamPart2 = true;
+                }
                 
                 // Anti-Cheese check: They cannot use the exact same word they just used for Part 1!
-                if (recentWords.Contains(playerWord) || playerWord == firstDoubleCastWord)
+                if (isSpamPart2 || playerWord == firstDoubleCastWord)
                 {
-                    Debug.Log("<color=red>Spam Filter: Cannot use a recent word OR your first combo word again!</color>");
+                    Debug.Log($"<color=red>Spam Filter: '{playerWord}' is blocked for this difficulty!</color>");
                     wordInputField.textComponent.color = Color.red; 
                     if (wordInputField.contentType == TMP_InputField.ContentType.Password)
                     {
@@ -487,7 +550,7 @@ public class BattleManager : MonoBehaviour
                     Debug.Log($"<color=cyan>DOUBLE CAST SUCCESS! Ultimate Spell Activated at {(finalPotency * 100).ToString("F1")}% Power!</color>");
                     
                     // Save ONLY the second word for the next turn's spam filter
-                    RecordSuccessfulWord(playerWord); 
+                    RecordSuccessfulWord(playerWord, currentQuest.targetLetter); 
                     
                     // Reset variables for safety
                     isWaitingForSecondWord = false;
@@ -514,9 +577,20 @@ public class BattleManager : MonoBehaviour
         // ==========================================
         // NORMAL CASTING (1 Word - Turns 1 to 4)
         // ==========================================
-        if (recentWords.Contains(playerWord))
+        // Dynamic Spam Filter Check
+        bool isSpamNormal = false;
+        if (usedWordsPerPrefix.ContainsKey(currentQuest.targetLetter))
         {
-            Debug.Log($"<color=red>Spam Filter: You used '{playerWord}' recently!</color>");
+            int limit = GetDynamicMemoryLimit(currentQuest.tier2Rule);
+            var history = usedWordsPerPrefix[currentQuest.targetLetter];
+            var activelyBlocked = history.Skip(Mathf.Max(0, history.Count - limit)).ToList();
+            
+            if (activelyBlocked.Contains(playerWord)) isSpamNormal = true;
+        }
+
+        if (isSpamNormal)
+        {
+            Debug.Log($"<color=red>Spam Filter: '{playerWord}' is blocked for this difficulty!</color>");
             wordInputField.textComponent.color = Color.red; 
             if (wordInputField.contentType == TMP_InputField.ContentType.Password)
             {
@@ -558,7 +632,7 @@ public class BattleManager : MonoBehaviour
 
         // 3. SUCCESS! Both tiers passed.
         Debug.Log($"<color=green>Spell Activated at {(finalPotency * 100).ToString("F1")}% Power.</color>");
-        RecordSuccessfulWord(playerWord);
+        RecordSuccessfulWord(playerWord, currentQuest.targetLetter);
         
         isLesserSpell = false; // Normal spell achieved!
         ChangeState(BattleState.Resolution);
@@ -710,14 +784,33 @@ public class BattleManager : MonoBehaviour
         isBannerSkipped = false; // Reset it again for the next banner!
     }
 
-    private void RecordSuccessfulWord(string word)
+    private void RecordSuccessfulWord(string word, string prefix)
     {
-        recentWords.Add(word);
-        
-        // If the list gets larger than 5, delete the oldest word (index 0)
-        if (recentWords.Count > 5)
+        if (!usedWordsPerPrefix.ContainsKey(prefix))
         {
-            recentWords.RemoveAt(0);
+            usedWordsPerPrefix[prefix] = new List<string>();
         }
+        
+        usedWordsPerPrefix[prefix].Add(word);
+        
+        // If the list gets larger than the max memory, delete the oldest word (index 0)
+        if (usedWordsPerPrefix[prefix].Count > maxMemoryPerPrefix)
+        {
+            usedWordsPerPrefix[prefix].RemoveAt(0);
+        }
+    }
+
+    private int GetDynamicMemoryLimit(Tier2Type rule)
+    {
+        // Define the Easy rules (These keep the 2-word memory)
+        Tier2Type[] easyRules = { 
+            Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.MinLength_5,
+            Tier2Type.EndsWith_S, Tier2Type.EndsWith_T, Tier2Type.EndsWith_E, Tier2Type.EndsWith_Y,
+            Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_L
+        };
+
+        // If it's an Easy rule, block 2 words. If Medium/Hard, only block 1!
+        if (easyRules.Contains(rule)) return 2;
+        return 1; 
     }
 }
