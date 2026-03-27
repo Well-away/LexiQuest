@@ -26,6 +26,7 @@ public class BattleManager : MonoBehaviour
     public GameObject questPanel;
     public GameObject inputArea;
     public QuestManager questManager; // Drag the script here in inspector
+    public DictionaryManager dictionaryManager;
     private QuestData currentQuest;
 
     [Header("Quest UI Text")]
@@ -399,6 +400,24 @@ public class BattleManager : MonoBehaviour
         if (playerWord.Length < 3)
         {
             Debug.Log("<color=red>Failed! Spells must be at least 3 letters long.</color>");
+            wordInputField.textComponent.color = Color.red; 
+            
+            // Unmask if it's a Blind Cast
+            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
+            {
+                wordInputField.contentType = TMP_InputField.ContentType.Standard;
+                wordInputField.ForceLabelUpdate();
+            }
+            isSubmitLocked = false;
+            return; 
+        }
+
+        // ==========================================
+        // DICTIONARY CHECK: IS IT A REAL WORD?
+        // ==========================================
+        if (!dictionaryManager.IsValidWord(playerWord))
+        {
+            Debug.Log($"<color=red>Failed! '{playerWord}' is not a recognized English word.</color>");
             wordInputField.textComponent.color = Color.red; 
             
             // Unmask if it's a Blind Cast
