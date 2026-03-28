@@ -9,6 +9,21 @@ public enum BattleState { Intro, CategorySelect, SpellSelect, QuestIntro, Typing
 
 public class BattleManager : MonoBehaviour
 {
+    [Header("Combat Stats (Prototype)")]
+    public float playerMaxHP = 100f;
+    private float playerCurrentHP;
+    public Image playerHealthBar; // Drag the Yellow Bar Image here
+
+    public float enemyMaxHP = 300f; // Boss Tier Health!
+    private float enemyCurrentHP;
+    public Image enemyHealthBar; // Drag the Red Bar Image here
+
+    public float baseSpellDamage = 20f;
+    public float enemyBaseDamage = 25f;
+
+    [Header("Cinematic UI Toggles")]
+    public GameObject mainUICanvas; // Drag the "Canvas" inside LexiQuestUIV2 here
+
     [Header("Typing Phase")]
     public TMP_InputField wordInputField;
     private float currentTypingTimer;
@@ -67,6 +82,9 @@ public class BattleManager : MonoBehaviour
 
     void Start()
     {
+        playerCurrentHP = playerMaxHP;
+        enemyCurrentHP = enemyMaxHP;
+        
         // Start the sequence!
         ChangeState(BattleState.Intro);
     }
@@ -85,19 +103,18 @@ public class BattleManager : MonoBehaviour
 
     public void ChangeState(BattleState newState)
     {
-        // PATCH 1: Kill any running timers/waits from the previous state
+        // Kill any running timers/waits from the previous state
         StopAllCoroutines(); 
 
         currentState = newState;
 
-        // Hide all panels first for a clean transition
-        introBanner.SetActive(false);
-        categoryPanel.SetActive(false);
-        spellPanel.SetActive(false);
-        questPanel.SetActive(false);
-        inputArea.SetActive(false);
-        
-        // PATCH 2: Hide the timer during transitions
+        // Hide all the specific interaction panels for a clean transition.
+        // But do NOT hide the main Canvas, so our Health Bars stay visible!
+        if (introBanner != null) introBanner.SetActive(false);
+        if (categoryPanel != null) categoryPanel.SetActive(false);
+        if (spellPanel != null) spellPanel.SetActive(false);
+        if (questPanel != null) questPanel.SetActive(false);
+        if (inputArea != null) inputArea.SetActive(false);
         if (timerPanel != null) timerPanel.SetActive(false); 
 
         switch (currentState)
@@ -109,21 +126,23 @@ public class BattleManager : MonoBehaviour
                 StartCoroutine(HandleCategorySelection());
                 break;
             case BattleState.SpellSelect:
-                StartCoroutine(HandleSpellSelection()); // Changed this line!
+                StartCoroutine(HandleSpellSelection()); 
                 break;
             case BattleState.QuestIntro:
                 StartCoroutine(HandleQuestIntro());
                 break;
             case BattleState.Typing:
-                inputArea.SetActive(true);
-                questPanel.SetActive(true);
+                if (inputArea != null) inputArea.SetActive(true);
+                if (questPanel != null) questPanel.SetActive(true);
                 StartCoroutine(HandleTyping());
                 break;
             case BattleState.Resolution:
+                // Resolution hides the UI panels (handled above), but leaves the health bars alone!
                 StartCoroutine(HandleResolution());
                 break;
             case BattleState.EnemyTurn:
-                StartCoroutine(HandleEnemyTurn()); // <-- ADD THIS CASE
+                // Enemy turn also leaves health bars alone!
+                StartCoroutine(HandleEnemyTurn()); 
                 break;
         }
     }
@@ -659,52 +678,57 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleResolution()
     {
-        inputArea.SetActive(false);
-        questPanel.SetActive(false);
+        // 1. Calculate Damage (We will add the Length Multipliers in Step 2)
+        float damageDealt = isLesserSpell ? (baseSpellDamage * 0.5f) : baseSpellDamage;
 
-        introBanner.SetActive(true);
+        // 2. Apply Damage to the Wind Serpent
+        enemyCurrentHP -= damageDealt;
+        if (enemyCurrentHP < 0) enemyCurrentHP = 0;
         
-        // Dynamically change the banner text based on how they performed
-        if (isLesserSpell)
-        {
-            bannerText.text = "ARCANE BOLT! (Weak)";
-            bannerText.color = Color.gray; // Make it look weak
-        }
-        else
-        {
-            bannerText.text = "SPELL CAST!";
-            bannerText.color = Color.black; // <--- CHANGE TO BLACK
-        }
-        
-        yield return StartCoroutine(WaitOrSkip(2f)); 
+        // Update the visual Red Bar
+        enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
 
-        introBanner.SetActive(false);
-        bannerText.color = Color.black; // <--- CHANGE TO BLACK (Reset for next time)
-        
-        Debug.Log("Turn Ended. Golem's Turn!");
+        Debug.Log($"<color=cyan>Amy casts a spell for {damageDealt} damage! Serpent HP: {enemyCurrentHP}</color>");
+
+        // 3. Pause so the player can watch the 3D scene (UI is hidden!)
+        yield return new WaitForSeconds(3.5f); 
+
+        // 4. Check for Boss Death
+        if (enemyCurrentHP <= 0)
+        {
+            Debug.Log("<color=green>VICTORY! The Wind Serpent is defeated.</color>");
+            // We will add a Victory State later, but for now, stop the battle:
+            yield break; 
+        }
         ChangeState(BattleState.EnemyTurn);
     }
 
     IEnumerator HandleEnemyTurn()
     {
-        Debug.Log("Enemy Turn Started.");
+        Debug.Log("<color=red>Wind Serpent attacks!</color>");
         
-        // Show Enemy Banner
-        introBanner.SetActive(true);
-        bannerText.text = "ENEMY TURN...";
-        yield return StartCoroutine(WaitOrSkip(1.5f));
-        
-        // Simulate Attack
-        bannerText.text = "GOLEM ATTACKS!";
-        // Later, you will trigger damage numbers and animations here
-        yield return StartCoroutine(WaitOrSkip(2.0f));
-        
-        introBanner.SetActive(false);
+        // Apply Damage to Amy
+        playerCurrentHP -= enemyBaseDamage;
+        if (playerCurrentHP < 0) playerCurrentHP = 0;
+
+        // Update the visual Yellow Bar
+        playerHealthBar.fillAmount = playerCurrentHP / playerMaxHP;
+
+        Debug.Log($"<color=orange>Serpent hits Amy for {enemyBaseDamage} damage! Amy HP: {playerCurrentHP}</color>");
+
+        // Pause to watch the enemy attack
+        yield return new WaitForSeconds(3.0f);
+
+        // Check for Player Death
+        if (playerCurrentHP <= 0)
+        {
+            Debug.Log("<color=red>GAME OVER! Amy has fallen.</color>");
+            yield break; 
+        }
         
         // LOOP BACK TO PLAYER
-        Debug.Log("Enemy Turn Ended. Player's Turn!");
-        currentTurn++; // <--- ADD THIS LINE
-        ChangeState(BattleState.Intro); // Loop back to the player's turn
+        currentTurn++; 
+        ChangeState(BattleState.Intro); 
     }
 
     private void UpdateTimerUI(float currentTime, float maxTime)
