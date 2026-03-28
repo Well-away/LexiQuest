@@ -20,6 +20,7 @@ public class BattleManager : MonoBehaviour
 
     public float baseSpellDamage = 20f;
     public float enemyBaseDamage = 25f;
+    private float currentSpellPotency = 1.0f;
 
     [Header("Cinematic UI Toggles")]
     public GameObject mainUICanvas; // Drag the "Canvas" inside LexiQuestUIV2 here
@@ -449,8 +450,24 @@ public class BattleManager : MonoBehaviour
             return; 
         }
 
-        // --- POTENCY CALCULATION (Applies to all casts) ---
+        // --- POTENCY CALCULATION ---
         float finalPotency = 1.0f;
+
+        // 1. Length Multipliers (The Core Thesis Mechanic)
+        int len = playerWord.Length;
+        if (len == 3) finalPotency = 0.8f;
+        else if (len >= 4 && len <= 5) finalPotency = 1.0f;
+        else if (len >= 6 && len <= 7) finalPotency = 1.25f;
+        else if (len >= 8) finalPotency = 1.5f;
+
+        // 2. Ultimate Boss Bonus
+        // If they just successfully finished Part 2 of a Double Cast, give them massive damage!
+        if (currentQuest.tier3Rule == Tier3Type.DoubleCast && isWaitingForSecondWord)
+        {
+            finalPotency = 2.0f;
+        }
+
+        // 3. Overtime Penalty (Your existing logic)
         if (isOvertime)
         {
             float timeUsed = maxOvertime - currentOvertime; 
@@ -458,6 +475,9 @@ public class BattleManager : MonoBehaviour
             float penalty = overtimePercentage * maxPenaltyPercent;
             finalPotency -= penalty;
         }
+
+        // Save it so the Resolution state can calculate the final HP reduction!
+        currentSpellPotency = finalPotency;
 
         // ==========================================
         // ULTIMATE MECHANIC: SEQUENTIAL DOUBLE CAST
@@ -678,8 +698,11 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleResolution()
     {
-        // 1. Calculate Damage (We will add the Length Multipliers in Step 2)
-        float damageDealt = isLesserSpell ? (baseSpellDamage * 0.5f) : baseSpellDamage;
+        // 1. Calculate Damage based on the Potency Math
+        float damageDealt = baseSpellDamage * currentSpellPotency;
+        
+        // If they timed out and cast a weak Arcane Bolt, cut it in half!
+        if (isLesserSpell) damageDealt *= 0.5f; 
 
         // 2. Apply Damage to the Wind Serpent
         enemyCurrentHP -= damageDealt;
@@ -688,16 +711,16 @@ public class BattleManager : MonoBehaviour
         // Update the visual Red Bar
         enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
 
-        Debug.Log($"<color=cyan>Amy casts a spell for {damageDealt} damage! Serpent HP: {enemyCurrentHP}</color>");
+        // Print the math to the console so you can prove it works!
+        Debug.Log($"<color=cyan>Spell Power: {currentSpellPotency}x | Damage Dealt: {damageDealt} | Serpent HP: {enemyCurrentHP}</color>");
 
-        // 3. Pause so the player can watch the 3D scene (UI is hidden!)
+        // 3. Pause so the player can watch the 3D scene
         yield return new WaitForSeconds(3.5f); 
 
         // 4. Check for Boss Death
         if (enemyCurrentHP <= 0)
         {
             Debug.Log("<color=green>VICTORY! The Wind Serpent is defeated.</color>");
-            // We will add a Victory State later, but for now, stop the battle:
             yield break; 
         }
         ChangeState(BattleState.EnemyTurn);
