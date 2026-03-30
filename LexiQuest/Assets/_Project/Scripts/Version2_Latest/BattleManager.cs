@@ -32,6 +32,11 @@ public class BattleManager : MonoBehaviour
     private bool isBannerSkipped = false;
     private bool isSubmitLocked = false;
 
+    [Header("Mobile Keyboard Offset")]
+    public float keyboardYOffset = 450f; // How high it moves up (Tweak this in Inspector!)
+    private RectTransform inputAreaRect;
+    private Vector2 originalInputPos;
+
     [Header("Battle State")]
     public int currentTurn = 1;
 
@@ -44,6 +49,10 @@ public class BattleManager : MonoBehaviour
     public QuestManager questManager; // Drag the script here in inspector
     public DictionaryManager dictionaryManager;
     private QuestData currentQuest;
+
+    [Header("Clutch Suggestions")]
+    public GameObject suggestionPanel;
+    public TextMeshProUGUI suggestionText;
 
     [Header("Quest UI Text")]
     public TextMeshProUGUI bannerText; // The text on your IntroBanner
@@ -83,6 +92,13 @@ public class BattleManager : MonoBehaviour
 
     void Start()
     {
+        // Grab the RectTransform and save its original position!
+        if (inputArea != null)
+        {
+            inputAreaRect = inputArea.GetComponent<RectTransform>();
+            originalInputPos = inputAreaRect.anchoredPosition;
+        }
+
         playerCurrentHP = playerMaxHP;
         enemyCurrentHP = enemyMaxHP;
         
@@ -99,6 +115,20 @@ public class BattleManager : MonoBehaviour
             {
                 SubmitWord();
             }
+        }
+
+        // ==========================================
+        // MOBILE KEYBOARD AVOIDANCE
+        // ==========================================
+        if (inputAreaRect != null && inputArea.activeSelf)
+        {
+            // If the player is actively typing, target the shifted position. Otherwise, target the original.
+            float targetY = wordInputField.isFocused ? (originalInputPos.y + keyboardYOffset) : originalInputPos.y;
+            
+            Vector2 targetPos = new Vector2(originalInputPos.x, targetY);
+
+            // Vector2.Lerp smoothly glides the panel to the target position instead of teleporting it instantly
+            inputAreaRect.anchoredPosition = Vector2.Lerp(inputAreaRect.anchoredPosition, targetPos, Time.deltaTime * 10f);
         }
     }
 
@@ -117,6 +147,7 @@ public class BattleManager : MonoBehaviour
         if (questPanel != null) questPanel.SetActive(false);
         if (inputArea != null) inputArea.SetActive(false);
         if (timerPanel != null) timerPanel.SetActive(false); 
+        if (suggestionPanel != null) suggestionPanel.SetActive(false);
 
         switch (currentState)
         {
@@ -300,6 +331,7 @@ public class BattleManager : MonoBehaviour
         inputArea.SetActive(true);
         questPanel.SetActive(true);
         timerPanel.SetActive(true); 
+        if (suggestionPanel != null) suggestionPanel.SetActive(false);
 
         isOvertime = false; // Reset overtime flag
         wordInputField.text = ""; 
@@ -372,6 +404,31 @@ public class BattleManager : MonoBehaviour
                 isOvertime = true;
                 currentOvertime = maxOvertime;
 
+                // ==========================================
+                // CLUTCH SUGGESTION FEATURE
+                // ==========================================
+                if (dictionaryManager != null && suggestionPanel != null)
+                {
+                    // 1. Get the currently blocked words so we don't suggest a banned word!
+                    List<string> activeBlockedWords = new List<string>();
+                    if (usedWordsPerPrefix.ContainsKey(currentQuest.targetLetter))
+                    {
+                        int limit = GetDynamicMemoryLimit(currentQuest.tier2Rule);
+                        var history = usedWordsPerPrefix[currentQuest.targetLetter];
+                        activeBlockedWords = history.Skip(Mathf.Max(0, history.Count - limit)).ToList();
+                    }
+
+                    // 2. Ask the dictionary for 2 short words
+                    List<string> hints = dictionaryManager.GetClutchSuggestions(currentQuest.targetLetter, currentQuest.tier2Rule, activeBlockedWords, 2);
+                    
+                    // 3. Display them!
+                    if (hints.Count > 0)
+                    {
+                        suggestionPanel.SetActive(true);
+                        suggestionText.text = "CLUTCH HINT: Try '" + string.Join("' or '", hints) + "'";
+                    }
+                }
+
                 while (currentOvertime > 0 && currentState == BattleState.Typing)
                 {
                     currentOvertime -= Time.deltaTime;
@@ -385,7 +442,7 @@ public class BattleManager : MonoBehaviour
                 // Speed Casting Time is Up! 
                 Debug.Log("<color=red>Speed Casting Timer Exhausted! Spell Failed.</color>");
                 ChangeState(BattleState.Resolution); 
-                yield break; // Stop the coroutine immediately
+                yield break; 
             }
         }
 
@@ -453,27 +510,32 @@ public class BattleManager : MonoBehaviour
         // --- POTENCY CALCULATION ---
         float finalPotency = 1.0f;
 
-        // 1. Length Multipliers (The Core Thesis Mechanic)
-        int len = playerWord.Length;
-        if (len == 3) finalPotency = 0.8f;
-        else if (len >= 4 && len <= 5) finalPotency = 1.0f;
-        else if (len >= 6 && len <= 7) finalPotency = 1.25f;
-        else if (len >= 8) finalPotency = 1.5f;
-
-        // 2. Ultimate Boss Bonus
-        // If they just successfully finished Part 2 of a Double Cast, give them massive damage!
-        if (currentQuest.tier3Rule == Tier3Type.DoubleCast && isWaitingForSecondWord)
-        {
-            finalPotency = 2.0f;
-        }
-
-        // 3. Overtime Penalty (Your existing logic)
+        // THESIS MECHANIC: If they are in Overtime, strip away all length multipliers!
+        // They only get Base Damage minus the penalty.
         if (isOvertime)
         {
+            Debug.Log("<color=orange>Overtime Cast! Length multipliers are disabled.</color>");
             float timeUsed = maxOvertime - currentOvertime; 
             float overtimePercentage = timeUsed / maxOvertime; 
             float penalty = overtimePercentage * maxPenaltyPercent;
+            
+            // Apply the penalty to the base 1.0f potency
             finalPotency -= penalty;
+        }
+        else 
+        {
+            // NORMAL TURN: Reward them for their vocabulary!
+            int len = playerWord.Length;
+            if (len == 3) finalPotency = 0.8f;
+            else if (len >= 4 && len <= 5) finalPotency = 1.0f;
+            else if (len >= 6 && len <= 7) finalPotency = 1.25f;
+            else if (len >= 8) finalPotency = 1.5f;
+
+            // Ultimate Boss Bonus (Only applies if they aren't in overtime!)
+            if (currentQuest.tier3Rule == Tier3Type.DoubleCast && isWaitingForSecondWord)
+            {
+                finalPotency = 2.0f;
+            }
         }
 
         // Save it so the Resolution state can calculate the final HP reduction!

@@ -1,53 +1,76 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 
 public class DictionaryManager : MonoBehaviour
 {
-    // A HashSet is insanely fast for checking if something exists
     private HashSet<string> validWords;
+    private HashSet<string> bannedWords; // THESIS UPGRADE: The manual Blacklist!
 
     void Awake()
     {
-        LoadDictionary();
+        LoadDictionaries();
     }
 
-    private void LoadDictionary()
+    private void LoadDictionaries()
     {
         validWords = new HashSet<string>();
+        bannedWords = new HashSet<string>();
         
-        // 1. Load the text file from the Resources folder (do not include the .txt extension here)
-        TextAsset dictionaryAsset = Resources.Load<TextAsset>("words_alpha");
-
-        if (dictionaryAsset == null)
+        // 1. LOAD THE BAN LIST FIRST
+        TextAsset banAsset = Resources.Load<TextAsset>("banned_words");
+        if (banAsset != null)
         {
-            Debug.LogError("Dictionary file not found! Make sure it's inside the 'Resources' folder and named 'words_alpha'.");
-            return;
-        }
-
-        // 2. Split the giant block of text into individual lines
-        string[] lines = dictionaryAsset.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
-
-        // 3. Filter and save the words
-        foreach (string line in lines)
-        {
-            // Remove any accidental spaces and force it to match our game's ALL CAPS style
-            string cleanWord = line.Trim().ToUpper();
-            
-            // THESIS FILTER: Only load words that are 3 letters or longer!
-            if (cleanWord.Length >= 3)
+            string[] banLines = banAsset.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in banLines)
             {
-                validWords.Add(cleanWord);
+                bannedWords.Add(line.Trim().ToUpper());
             }
+            Debug.Log($"<color=orange>Blacklist Loaded: {bannedWords.Count} regional/obscure words banned.</color>");
         }
 
-        Debug.Log($"<color=cyan>Dictionary Loaded: {validWords.Count} valid English words ready!</color>");
+        // 2. LOAD THE ENABLE DICTIONARY
+        TextAsset dictionaryAsset = Resources.Load<TextAsset>("enable_words");
+        if (dictionaryAsset != null)
+        {
+            string[] lines = dictionaryAsset.text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in lines)
+            {
+                string cleanWord = line.Trim().ToUpper();
+                
+                // Only add the word if it is 3+ letters AND it is NOT in our Blacklist!
+                if (cleanWord.Length >= 3 && !bannedWords.Contains(cleanWord))
+                {
+                    validWords.Add(cleanWord);
+                }
+            }
+            Debug.Log($"<color=cyan>ENABLE Dictionary Loaded: {validWords.Count} professional English words ready!</color>");
+        }
     }
 
-    // Other scripts will call this one function to ask the Judge if a word is real
     public bool IsValidWord(string word)
     {
         if (validWords == null) return false;
-        
         return validWords.Contains(word.ToUpper());
+    }
+
+    public List<string> GetClutchSuggestions(string prefix, Tier2Type rule, List<string> blockedWords, int count = 2)
+    {
+        List<string> matches = new List<string>();
+        if (validWords == null) return matches;
+
+        foreach (string word in validWords)
+        {
+            if (word.Length >= 4 && word.Length <= 9 && 
+                word.StartsWith(prefix) && 
+                QuestValidator.CheckTier2(word, rule) && 
+                !blockedWords.Contains(word))
+            {
+                matches.Add(word);
+            }
+        }
+
+        System.Random rng = new System.Random();
+        return matches.OrderBy(w => rng.Next()).Take(count).ToList();
     }
 }
