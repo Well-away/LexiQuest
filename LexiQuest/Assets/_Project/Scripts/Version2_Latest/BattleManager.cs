@@ -5,7 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-public enum BattleState { Intro, CategorySelect, SpellSelect, QuestIntro, Typing, Resolution, EnemyTurn }
+public enum BattleState { MainMenu, Intro, CategorySelect, SpellSelect, QuestIntro, Typing, Resolution, EnemyTurn, GameOver }
 
 public class BattleManager : MonoBehaviour
 {
@@ -24,6 +24,12 @@ public class BattleManager : MonoBehaviour
 
     [Header("Cinematic UI Toggles")]
     public GameObject mainUICanvas; // Drag the "Canvas" inside LexiQuestUIV2 here
+
+    [Header("Endless Mode UI")]
+    public GameObject mainMenuPanel;
+    public GameObject gameOverPanel;
+    public TextMeshProUGUI scoreText;
+    private int enemiesDefeatedCount = 0;
 
     [Header("Typing Phase")]
     public TMP_InputField wordInputField;
@@ -92,18 +98,14 @@ public class BattleManager : MonoBehaviour
 
     void Start()
     {
-        // Grab the RectTransform and save its original position!
         if (inputArea != null)
         {
             inputAreaRect = inputArea.GetComponent<RectTransform>();
             originalInputPos = inputAreaRect.anchoredPosition;
         }
 
-        playerCurrentHP = playerMaxHP;
-        enemyCurrentHP = enemyMaxHP;
-        
-        // Start the sequence!
-        ChangeState(BattleState.Intro);
+        // Go to Main Menu instead of Intro!
+        ChangeState(BattleState.MainMenu); 
     }
 
     void Update()
@@ -148,9 +150,14 @@ public class BattleManager : MonoBehaviour
         if (inputArea != null) inputArea.SetActive(false);
         if (timerPanel != null) timerPanel.SetActive(false); 
         if (suggestionPanel != null) suggestionPanel.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        if (gameOverPanel != null) gameOverPanel.SetActive(false);
 
         switch (currentState)
         {
+            case BattleState.MainMenu:
+                if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
+                break;
             case BattleState.Intro:
                 StartCoroutine(HandleIntro());
                 break;
@@ -176,7 +183,32 @@ public class BattleManager : MonoBehaviour
                 // Enemy turn also leaves health bars alone!
                 StartCoroutine(HandleEnemyTurn()); 
                 break;
+            case BattleState.GameOver:
+                if (gameOverPanel != null) gameOverPanel.SetActive(true);
+                if (scoreText != null) scoreText.text = "Enemies Defeated: " + enemiesDefeatedCount;
+                break;
         }
+    }
+
+    public void StartEndlessGame()
+    {
+        playerCurrentHP = playerMaxHP;
+        enemyCurrentHP = enemyMaxHP;
+        enemiesDefeatedCount = 0;
+        
+        // Update your health bar visuals here if you have a function for it
+        if (playerHealthBar != null) playerHealthBar.fillAmount = 1f;
+        if (enemyHealthBar != null) enemyHealthBar.fillAmount = 1f;
+        
+        ChangeState(BattleState.Intro);
+    }
+
+    public void RestartGame()
+    {
+        // Reset the dictionary memory so they can use old words again
+        usedWordsPerPrefix.Clear(); 
+        
+        StartEndlessGame();
     }
 
     // --- PHASE LOGIC ---
@@ -779,10 +811,18 @@ public class BattleManager : MonoBehaviour
         // 3. Pause so the player can watch the 3D scene
         yield return new WaitForSeconds(3.5f); 
 
-        // 4. Check for Boss Death
+        // Check for Boss Death
         if (enemyCurrentHP <= 0)
         {
-            Debug.Log("<color=green>VICTORY! The Wind Serpent is defeated.</color>");
+            Debug.Log("<color=green>Enemy Defeated! A new challenger appears!</color>");
+            enemiesDefeatedCount++;
+            
+            // Resurrect the enemy for endless mode!
+            enemyCurrentHP = enemyMaxHP; 
+            if (enemyHealthBar != null) enemyHealthBar.fillAmount = 1f;
+            
+            // Loop back to the next turn!
+            ChangeState(BattleState.QuestIntro);
             yield break; 
         }
         ChangeState(BattleState.EnemyTurn);
@@ -807,8 +847,9 @@ public class BattleManager : MonoBehaviour
         // Check for Player Death
         if (playerCurrentHP <= 0)
         {
-            Debug.Log("<color=red>GAME OVER! Amy has fallen.</color>");
-            yield break; 
+            Debug.Log("<color=red>Amy has fallen...</color>");
+            ChangeState(BattleState.GameOver);
+            yield break;
         }
         
         // LOOP BACK TO PLAYER
