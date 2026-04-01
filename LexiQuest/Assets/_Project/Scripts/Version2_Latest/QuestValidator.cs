@@ -3,10 +3,15 @@ using System.Text.RegularExpressions;
 
 public static class QuestValidator
 {
-    // We pass the Tier2Type rule directly now
+    // We pass the Tier2Type rule directly from the QuestManager
     public static bool CheckTier2(string word, Tier2Type rule) 
     {
+        // Safety check to prevent null errors
+        if (string.IsNullOrEmpty(word)) return false;
+
         int len = word.Length;
+        string upperWord = word.ToUpper();
+
         switch (rule)
         {
             // --- SHAPES & SIZES ---
@@ -21,33 +26,33 @@ public static class QuestValidator
             case Tier2Type.MinLength_8: return len >= 8;
             
             // --- SUFFIXES ---
-            case Tier2Type.EndsWith_S: return word.EndsWith("S");
-            case Tier2Type.EndsWith_ED: return word.EndsWith("D"); // Covers D and ED
-            case Tier2Type.EndsWith_ER: return word.EndsWith("R"); // Covers R and ER
-            case Tier2Type.EndsWith_ING: return word.EndsWith("ING");
-            case Tier2Type.EndsWith_LY: return word.EndsWith("LY");
-            case Tier2Type.EndsWith_Y: return word.EndsWith("Y");
-            case Tier2Type.EndsWith_T: return word.EndsWith("T");
-            case Tier2Type.EndsWith_N: return word.EndsWith("N");
-            case Tier2Type.EndsWith_E: return word.EndsWith("E");
-            case Tier2Type.EndsWith_TION: return word.EndsWith("TION");
-            
+            case Tier2Type.EndsWith_S: return upperWord.EndsWith("S");
+            case Tier2Type.EndsWith_ED: return upperWord.EndsWith("D"); // Mathematically covers D and ED
+            case Tier2Type.EndsWith_ER: return upperWord.EndsWith("R"); // Mathematically covers R and ER
+            case Tier2Type.EndsWith_ING: return upperWord.EndsWith("ING");
+            case Tier2Type.EndsWith_LY: return upperWord.EndsWith("LY");
+            case Tier2Type.EndsWith_Y: return upperWord.EndsWith("Y");
+            case Tier2Type.EndsWith_T: return upperWord.EndsWith("T");
+            case Tier2Type.EndsWith_N: return upperWord.EndsWith("N");
+            case Tier2Type.EndsWith_E: return upperWord.EndsWith("E");
+            case Tier2Type.EndsWith_TION: return upperWord.EndsWith("TION");
             
             // --- EXCLUSIONS ---
-            case Tier2Type.No_Letter_A: return !word.Contains("A");
-            case Tier2Type.No_Letter_E: return !word.Contains("E");
-            case Tier2Type.No_Letter_I: return !word.Contains("I");
-            case Tier2Type.No_Letter_O: return !word.Contains("O");
-            case Tier2Type.No_Letter_U: return !word.Contains("U");
-            case Tier2Type.No_Letter_T: return !word.Contains("T");
-            case Tier2Type.No_Letter_S: return !word.Contains("S");
-            case Tier2Type.No_Letter_R: return !word.Contains("R");
-            case Tier2Type.No_Letter_N: return !word.Contains("N");
-            case Tier2Type.No_Letter_L: return !word.Contains("L");
-            case Tier2Type.No_Letter_P: return !word.Contains("P");
-            case Tier2Type.No_Letter_C: return !word.Contains("C");
-            
-            default: return false;
+            case Tier2Type.No_Letter_A: return !upperWord.Contains("A");
+            case Tier2Type.No_Letter_E: return !upperWord.Contains("E");
+            case Tier2Type.No_Letter_I: return !upperWord.Contains("I");
+            case Tier2Type.No_Letter_O: return !upperWord.Contains("O");
+            case Tier2Type.No_Letter_U: return !upperWord.Contains("U");
+            case Tier2Type.No_Letter_T: return !upperWord.Contains("T");
+            case Tier2Type.No_Letter_S: return !upperWord.Contains("S");
+            case Tier2Type.No_Letter_R: return !upperWord.Contains("R");
+            case Tier2Type.No_Letter_N: return !upperWord.Contains("N");
+            case Tier2Type.No_Letter_L: return !upperWord.Contains("L");
+            case Tier2Type.No_Letter_P: return !upperWord.Contains("P");
+            case Tier2Type.No_Letter_C: return !upperWord.Contains("C");
+
+            // Failsafe
+            default: return true;
         }
     }
 }
