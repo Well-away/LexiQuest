@@ -168,6 +168,9 @@ public class BattleManager : MonoBehaviour
                 StartCoroutine(HandleSpellSelection()); 
                 break;
             case BattleState.QuestIntro:
+                // Advance the global memory clock by 1!
+                if (dictionaryManager != null) dictionaryManager.globalTurnCount++; 
+                
                 StartCoroutine(HandleQuestIntro());
                 break;
             case BattleState.Typing:
@@ -572,6 +575,19 @@ public class BattleManager : MonoBehaviour
 
         // Save it so the Resolution state can calculate the final HP reduction!
         currentSpellPotency = finalPotency;
+
+        // ==========================================
+        // THESIS GOAL 3: WORD DISCOVERY BONUS
+        // ==========================================
+        if (dictionaryManager != null && !isOvertime) // (Optional: Don't give bonus if they are in overtime!)
+        {
+            float discoveryBonus = dictionaryManager.RegisterWordAndGetBonus(playerWord);
+            if (discoveryBonus > 1.0f)
+            {
+                Debug.Log($"<color=yellow>✨ DISCOVERY BONUS! '{playerWord}' grants 1.20x Damage! ✨</color>");
+                currentSpellPotency *= discoveryBonus;
+            }
+        }
 
         // ==========================================
         // ULTIMATE MECHANIC: SEQUENTIAL DOUBLE CAST
