@@ -104,6 +104,10 @@ public class BattleManager : MonoBehaviour
     [Header("Spell States")]
     public bool isLesserSpell = false;
 
+    [Header("Status Effects")]
+    public int enemyTurnSkipCount = 0;
+    public float enemyDamageMultiplier = 1.0f;
+
     void Start()
     {
         if (inputArea != null)
@@ -214,6 +218,8 @@ public class BattleManager : MonoBehaviour
         playerCurrentHP = playerMaxHP;
         enemyCurrentHP = enemyMaxHP;
         enemiesDefeatedCount = 0;
+        enemyTurnSkipCount = 0;
+        enemyDamageMultiplier = 1.0f;
         
         // Update your health bar visuals here if you have a function for it
         if (playerHealthBar != null) playerHealthBar.fillAmount = 1f;
@@ -898,21 +904,36 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleResolution()
     {
-        // 1. Calculate Damage based on the Potency Math
-        float damageDealt = baseSpellPotency * currentSpellPotency;
-        
-        // If they timed out and cast a weak Arcane Bolt, cut it in half!
-        if (isLesserSpell) damageDealt *= 0.5f; 
+        // 1. Is it an Offensive Spell?
+        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || 
+                            activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || 
+                            activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
 
-        // 2. Apply Damage to the Wind Serpent
-        enemyCurrentHP -= damageDealt;
-        if (enemyCurrentHP < 0) enemyCurrentHP = 0;
-        
-        // Update the visual Red Bar
-        enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
+        if (isOffensive)
+        {
+            // OFFENSIVE MATH: Deal Damage!
+            float damageDealt = baseSpellPotency * currentSpellPotency;
+            if (isLesserSpell) damageDealt *= 0.5f; 
 
-        // Print the math to the console so you can prove it works!
-        Debug.Log($"<color=cyan>Spell Power: {currentSpellPotency}x | Damage Dealt: {damageDealt} | Serpent HP: {enemyCurrentHP}</color>");
+            enemyCurrentHP -= damageDealt;
+            if (enemyCurrentHP < 0) enemyCurrentHP = 0;
+            
+            enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
+            Debug.Log($"<color=cyan>Offensive Spell: {activeSpell} | Power: {currentSpellPotency}x | Damage: {damageDealt} | Serpent HP: {enemyCurrentHP}</color>");
+        }
+        else
+        {
+            // UTILITY & HEALING MATH: Do not deal damage!
+            Debug.Log($"<color=cyan>Cast Non-Offensive Spell: {activeSpell} at {currentSpellPotency}x Potency!</color>");
+            
+            // --- THESIS MECHANIC: RESTRAINT ---
+            if (activeSpell == SpellType.Restraint)
+            {
+                Debug.Log("<color=yellow>Restraint applied! Serpent skips a turn and is weakened by 40%.</color>");
+                enemyTurnSkipCount = 1; // Skips 1 turn
+                enemyDamageMultiplier = 0.6f; // 40% weaker means it deals 60% of its normal damage
+            }
+        }
 
         // 3. Pause so the player can watch the 3D scene
         yield return new WaitForSeconds(3.5f); 
@@ -923,34 +944,49 @@ public class BattleManager : MonoBehaviour
             Debug.Log("<color=green>Enemy Defeated! A new challenger appears!</color>");
             enemiesDefeatedCount++;
             
-            // Resurrect the enemy for endless mode!
             enemyCurrentHP = enemyMaxHP; 
             if (enemyHealthBar != null) enemyHealthBar.fillAmount = 1f;
             
-            // Loop back to the next turn!
             ChangeState(BattleState.QuestIntro);
             yield break; 
         }
+        
         ChangeState(BattleState.EnemyTurn);
     }
 
     IEnumerator HandleEnemyTurn()
     {
+        // --- CHECK STATUS EFFECTS FIRST ---
+        if (enemyTurnSkipCount > 0)
+        {
+            Debug.Log("<color=cyan>The Wind Serpent is Restrained and cannot attack this turn!</color>");
+            enemyTurnSkipCount--; // Decrease the skip counter
+            yield return new WaitForSeconds(2.0f); // Pause so the player can read it!
+            
+            // Loop back to Amy's turn immediately!
+            currentTurn++;
+            ChangeState(BattleState.Intro);
+            yield break;
+        }
+
+        // --- NORMAL ENEMY ATTACK ---
         Debug.Log("<color=red>Wind Serpent attacks!</color>");
         
-        // Apply Damage to Amy
-        playerCurrentHP -= enemyBaseDamage;
+        // Calculate damage taking any active weakness multipliers into account
+        float finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
+        
+        playerCurrentHP -= finalEnemyDamage;
         if (playerCurrentHP < 0) playerCurrentHP = 0;
 
-        // Update the visual Yellow Bar
         playerHealthBar.fillAmount = playerCurrentHP / playerMaxHP;
 
-        Debug.Log($"<color=orange>Serpent hits Amy for {enemyBaseDamage} damage! Amy HP: {playerCurrentHP}</color>");
+        Debug.Log($"<color=orange>Serpent hits Amy for {finalEnemyDamage} damage! Amy HP: {playerCurrentHP}</color>");
 
-        // Pause to watch the enemy attack
+        // Reset the multiplier back to normal after they attack!
+        enemyDamageMultiplier = 1.0f;
+
         yield return new WaitForSeconds(3.0f);
 
-        // Check for Player Death
         if (playerCurrentHP <= 0)
         {
             Debug.Log("<color=red>Amy has fallen...</color>");
