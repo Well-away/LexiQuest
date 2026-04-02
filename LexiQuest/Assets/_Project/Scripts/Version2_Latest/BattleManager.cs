@@ -14,6 +14,10 @@ public class BattleManager : MonoBehaviour
     private float playerCurrentHP;
     public Image playerHealthBar; // Drag the Yellow Bar Image here
 
+    // --- NEW SHIELD VARIABLES ---
+    public float playerCurrentShield = 0f;
+    public Image playerShieldBar; // Drag the White Bar Image here!
+
     public float enemyMaxHP = 300f; // Boss Tier Health!
     private float enemyCurrentHP;
     public Image enemyHealthBar; // Drag the Red Bar Image here
@@ -217,13 +221,12 @@ public class BattleManager : MonoBehaviour
     {
         playerCurrentHP = playerMaxHP;
         enemyCurrentHP = enemyMaxHP;
+        playerCurrentShield = 0f;
         enemiesDefeatedCount = 0;
         enemyTurnSkipCount = 0;
         enemyDamageMultiplier = 1.0f;
         
-        // Update your health bar visuals here if you have a function for it
-        if (playerHealthBar != null) playerHealthBar.fillAmount = 1f;
-        if (enemyHealthBar != null) enemyHealthBar.fillAmount = 1f;
+        UpdateHealthUI();
         
         ChangeState(BattleState.Intro);
     }
@@ -918,7 +921,7 @@ public class BattleManager : MonoBehaviour
             enemyCurrentHP -= damageDealt;
             if (enemyCurrentHP < 0) enemyCurrentHP = 0;
             
-            enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
+            UpdateHealthUI();
             Debug.Log($"<color=cyan>Offensive Spell: {activeSpell} | Power: {currentSpellPotency}x | Damage: {damageDealt} | Serpent HP: {enemyCurrentHP}</color>");
         }
         else
@@ -926,13 +929,23 @@ public class BattleManager : MonoBehaviour
             // UTILITY & HEALING MATH: Do not deal damage!
             Debug.Log($"<color=cyan>Cast Non-Offensive Spell: {activeSpell} at {currentSpellPotency}x Potency!</color>");
             
+            // --- THESIS MECHANIC: SHIELDS ---
+            if (activeSpell == SpellType.WindVeil || activeSpell == SpellType.FlameBarrier || activeSpell == SpellType.ManaShield)
+            {
+                float shieldAmount = baseSpellPotency * currentSpellPotency;
+                playerCurrentShield += shieldAmount; // Stack the shield!
+                Debug.Log($"<color=cyan>Shield Applied! Amy gains {shieldAmount} Shield. Total Shield: {playerCurrentShield}</color>");
+            }
+
             // --- THESIS MECHANIC: RESTRAINT ---
             if (activeSpell == SpellType.Restraint)
             {
                 Debug.Log("<color=yellow>Restraint applied! Serpent skips a turn and is weakened by 40%.</color>");
-                enemyTurnSkipCount = 1; // Skips 1 turn
-                enemyDamageMultiplier = 0.6f; // 40% weaker means it deals 60% of its normal damage
+                enemyTurnSkipCount = 1; 
+                enemyDamageMultiplier = 0.6f; 
             }
+
+            UpdateHealthUI(); // Update the visual bars instantly!
         }
 
         // 3. Pause so the player can watch the 3D scene
@@ -945,7 +958,7 @@ public class BattleManager : MonoBehaviour
             enemiesDefeatedCount++;
             
             enemyCurrentHP = enemyMaxHP; 
-            if (enemyHealthBar != null) enemyHealthBar.fillAmount = 1f;
+            UpdateHealthUI();
             
             ChangeState(BattleState.QuestIntro);
             yield break; 
@@ -974,16 +987,36 @@ public class BattleManager : MonoBehaviour
         
         // Calculate damage taking any active weakness multipliers into account
         float finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
-        
-        playerCurrentHP -= finalEnemyDamage;
-        if (playerCurrentHP < 0) playerCurrentHP = 0;
+        enemyDamageMultiplier = 1.0f; // Reset weakness immediately
 
-        playerHealthBar.fillAmount = playerCurrentHP / playerMaxHP;
+        // 1. SHIELD ABSORPTION MATH
+        if (playerCurrentShield > 0)
+        {
+            if (playerCurrentShield >= finalEnemyDamage)
+            {
+                // The shield survives the hit!
+                playerCurrentShield -= finalEnemyDamage;
+                Debug.Log($"<color=cyan>Shield absorbed all {finalEnemyDamage} damage! Shield remaining: {playerCurrentShield}</color>");
+                finalEnemyDamage = 0; // No damage left to hit Amy
+            }
+            else
+            {
+                // The shield shatters, and the leftover damage bleeds through!
+                Debug.Log($"<color=cyan>Shield absorbed {playerCurrentShield} damage and shattered!</color>");
+                finalEnemyDamage -= playerCurrentShield;
+                playerCurrentShield = 0; // Shield is gone
+            }
+        }
 
-        Debug.Log($"<color=orange>Serpent hits Amy for {finalEnemyDamage} damage! Amy HP: {playerCurrentHP}</color>");
+        // 2. APPLY LEFTOVER DAMAGE TO AMY'S HP
+        if (finalEnemyDamage > 0)
+        {
+            playerCurrentHP -= finalEnemyDamage;
+            if (playerCurrentHP < 0) playerCurrentHP = 0;
+            Debug.Log($"<color=orange>Serpent hits Amy for {finalEnemyDamage} damage! Amy HP: {playerCurrentHP}</color>");
+        }
 
-        // Reset the multiplier back to normal after they attack!
-        enemyDamageMultiplier = 1.0f;
+        UpdateHealthUI(); // Update the visual yellow and white bars!
 
         yield return new WaitForSeconds(3.0f);
 
@@ -1019,6 +1052,36 @@ public class BattleManager : MonoBehaviour
         else
         {
             timerFillBar.color = Color.green; 
+        }
+    }
+
+    private void UpdateHealthUI()
+    {
+        // 1. Update Boss Health
+        if (enemyHealthBar != null) enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
+
+        // 2. Update Amy's Health & Shield
+        if (playerHealthBar != null && playerShieldBar != null) 
+        {
+            float hpPercent = playerCurrentHP / playerMaxHP;
+            float shieldPercent = playerCurrentShield / playerMaxHP;
+
+            if (hpPercent + shieldPercent > 1.0f)
+            {
+                // OVERSHIELD: The shield overflows the max HP!
+                // We cap the white shield bar at 100%, and visually shrink the yellow HP bar 
+                // so the white shield pushes into it from the right side.
+                playerShieldBar.fillAmount = 1.0f; 
+                
+                float overflowAmount = (hpPercent + shieldPercent) - 1.0f;
+                playerHealthBar.fillAmount = Mathf.Clamp01(hpPercent - overflowAmount); 
+            }
+            else
+            {
+                // NORMAL: The white shield naturally sticks out to the right of the yellow HP
+                playerShieldBar.fillAmount = hpPercent + shieldPercent;
+                playerHealthBar.fillAmount = hpPercent;
+            }
         }
     }
 
