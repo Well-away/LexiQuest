@@ -18,7 +18,7 @@ public class BattleManager : MonoBehaviour
     private float enemyCurrentHP;
     public Image enemyHealthBar; // Drag the Red Bar Image here
 
-    public float baseSpellDamage = 20f;
+    public float baseSpellPotency = 20f;
     public float enemyBaseDamage = 25f;
     private float currentSpellPotency = 1.0f;
 
@@ -30,6 +30,14 @@ public class BattleManager : MonoBehaviour
     public GameObject gameOverPanel;
     public TextMeshProUGUI scoreText;
     private int enemiesDefeatedCount = 0;
+
+    [Header("Phase 1 & 2 Drafting UI")]
+    public GameObject categorySelectPanel;
+    public GameObject spellSelectPanel;
+    public TextMeshProUGUI[] draftButtonTexts; // The 3 Text objects for the random spells
+    
+    private SpellType activeSpell;
+    private SpellType[] currentlyDraftedSpells = new SpellType[3];
 
     [Header("Typing Phase")]
     public TMP_InputField wordInputField;
@@ -152,6 +160,8 @@ public class BattleManager : MonoBehaviour
         if (suggestionPanel != null) suggestionPanel.SetActive(false);
         if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
+        if (categorySelectPanel != null) categorySelectPanel.SetActive(false);
+        if (spellSelectPanel != null) spellSelectPanel.SetActive(false);
 
         switch (currentState)
         {
@@ -159,13 +169,13 @@ public class BattleManager : MonoBehaviour
                 if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
                 break;
             case BattleState.Intro:
-                StartCoroutine(HandleIntro());
+                StartCoroutine(WaitAndChangeState(2f, BattleState.CategorySelect));
                 break;
             case BattleState.CategorySelect:
                 StartCoroutine(HandleCategorySelection());
                 break;
             case BattleState.SpellSelect:
-                StartCoroutine(HandleSpellSelection()); 
+                StartCoroutine(HandleSpellSelection());
                 break;
             case BattleState.QuestIntro:
                 // Advance the global memory clock by 1!
@@ -193,6 +203,12 @@ public class BattleManager : MonoBehaviour
         }
     }
 
+    private IEnumerator WaitAndChangeState(float delay, BattleState nextState)
+    {
+        yield return new WaitForSeconds(delay);
+        ChangeState(nextState);
+    }
+
     public void StartEndlessGame()
     {
         playerCurrentHP = playerMaxHP;
@@ -214,6 +230,55 @@ public class BattleManager : MonoBehaviour
         StartEndlessGame();
     }
 
+    public void SelectCategory(int categoryIndex)
+    {
+        SpellCategory chosenCategory = (SpellCategory)categoryIndex;
+        DraftRandomSpells(chosenCategory);
+        ChangeState(BattleState.SpellSelect);
+    }
+
+    private void DraftRandomSpells(SpellCategory category)
+    {
+        List<SpellType> pool = new List<SpellType>();
+
+        if (category == SpellCategory.Offensive)
+        {
+            pool = new List<SpellType> { SpellType.FlameBlast, SpellType.FrostSpikes, SpellType.ThunderStrike, SpellType.GaleBurst, SpellType.EarthThrow, SpellType.ArcaneBolts };
+        }
+        else if (category == SpellCategory.Utility)
+        {
+            pool = new List<SpellType> { SpellType.WindVeil, SpellType.FlameBarrier, SpellType.ManaShield, SpellType.Restraint };
+        }
+        else if (category == SpellCategory.Healing)
+        {
+            pool = new List<SpellType> { SpellType.Revitalize, SpellType.Cleanse, SpellType.PurifyingFlames, SpellType.WinterEmbrace, SpellType.SoothingWaters };
+        }
+
+        // Shuffle the pool and pick the top 3
+        System.Random rng = new System.Random();
+        pool = pool.OrderBy(x => rng.Next()).ToList();
+
+        for (int i = 0; i < 3; i++)
+        {
+            currentlyDraftedSpells[i] = pool[i];
+            if (draftButtonTexts.Length > i && draftButtonTexts[i] != null)
+            {
+                draftButtonTexts[i].text = string.Concat(currentlyDraftedSpells[i].ToString().Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+            }
+        }
+    }
+
+    // 3. Player clicks one of the 3 drafted spells
+    public void SelectDraftedSpell(int buttonIndex) // UI Buttons send 0, 1, or 2
+    {
+        activeSpell = currentlyDraftedSpells[buttonIndex];
+        
+        // BUG FIX: Pass 'currentTurn' so the Ultimate Boss mechanic triggers exactly on Turn 5!
+        currentQuest = questManager.GenerateQuest(currentTurn, activeSpell); 
+        
+        ChangeState(BattleState.QuestIntro);
+    }
+
     // --- PHASE LOGIC ---
 
     IEnumerator HandleIntro()
@@ -233,21 +298,22 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleCategorySelection()
     {
-        categoryPanel.SetActive(true);
-        timerPanel.SetActive(true); // Turn on Timer
+        if (categorySelectPanel != null) categorySelectPanel.SetActive(true);
+        if (timerPanel != null) timerPanel.SetActive(true); 
+        
         float currentTimer = selectionTimer;
 
         while (currentTimer > 0 && currentState == BattleState.CategorySelect)
         {
             currentTimer -= Time.deltaTime;
-            UpdateTimerUI(currentTimer, selectionTimer); // Update visual
+            UpdateTimerUI(currentTimer, selectionTimer); 
             yield return null;
         }
 
         if (currentTimer <= 0 && currentState == BattleState.CategorySelect)
         {
-            Debug.Log("Time out! Defaulting to Defensive.");
-            OnCategorySelected("Defense");
+            Debug.Log("Time out! Defaulting to Offensive.");
+            SelectCategory(0); // Auto-pick Offensive (0)
         }
     }
 
@@ -259,25 +325,22 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleSpellSelection()
     {
-        spellPanel.SetActive(true);
-        timerPanel.SetActive(true); // Turn on the visual timer
+        if (spellSelectPanel != null) spellSelectPanel.SetActive(true);
+        if (timerPanel != null) timerPanel.SetActive(true);
 
         float currentSpellTimer = spellSelectionTimer;
 
-        // The 15-second countdown loop
         while (currentSpellTimer > 0 && currentState == BattleState.SpellSelect)
         {
             currentSpellTimer -= Time.deltaTime;
-            UpdateTimerUI(currentSpellTimer, spellSelectionTimer); // Update visual bar
+            UpdateTimerUI(currentSpellTimer, spellSelectionTimer); 
             yield return null;
         }
 
-        // If time runs out and they haven't clicked a spell yet
         if (currentSpellTimer <= 0 && currentState == BattleState.SpellSelect)
         {
-            Debug.Log("Time out! Defaulting to the first spell.");
-            // Simulate the player clicking the first spell option
-            OnSpellSelected("Default Spell"); 
+            Debug.Log("Time out! Defaulting to the first drafted spell.");
+            SelectDraftedSpell(0); // Auto-pick the first spell slot (0)
         }
     }
 
@@ -289,15 +352,12 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleQuestIntro()
     {
-        // 1. Generate the fresh quest data based on the current turn
-        currentQuest = questManager.GenerateQuest(currentTurn);
-
-        // 2. TIER 1 BANNER (The Letter)
+        
         introBanner.SetActive(true);
         bannerText.text = "QUEST: Word starting with '" + currentQuest.targetLetter + "'";
         yield return StartCoroutine(WaitOrSkip(3f));
 
-        // 3. TIER 2 BANNER (The Length)
+        
         bannerText.text = "SIDE QUEST: " + currentQuest.tier2Description;
         yield return StartCoroutine(WaitOrSkip(3f));
 
@@ -543,33 +603,63 @@ public class BattleManager : MonoBehaviour
         }
 
         // --- POTENCY CALCULATION ---
-        float finalPotency = 1.0f;
+        
+        // 1. ALWAYS get the spell's inherent potency multiplier first!
+        float spellMultiplier = 1.0f;
+        switch(activeSpell)
+        {
+            // OFFENSIVE
+            case SpellType.FlameBlast: spellMultiplier = 1.2f; break;
+            case SpellType.FrostSpikes: spellMultiplier = 1.3f; break;
+            case SpellType.ThunderStrike: spellMultiplier = 2.0f; break;
+            case SpellType.GaleBurst: spellMultiplier = 1.0f; break;
+            case SpellType.EarthThrow: spellMultiplier = 1.5f; break;
+            case SpellType.ArcaneBolts: spellMultiplier = 0.75f; break;
+            
+            // UTILITY (Base potency mappings until effects are added)
+            case SpellType.WindVeil: spellMultiplier = 0.75f; break;
+            case SpellType.FlameBarrier: spellMultiplier = 0.5f; break;
+            case SpellType.ManaShield: spellMultiplier = 1.5f; break;
+            case SpellType.Restraint: spellMultiplier = 1.0f; break; // Baseline potency for the weaken calculation later
+            
+            // HEALING (Base potency mappings until effects are added)
+            case SpellType.Revitalize: spellMultiplier = 0.5f; break;
+            case SpellType.Cleanse: spellMultiplier = 0.25f; break;
+            case SpellType.PurifyingFlames: spellMultiplier = 1.0f; break; 
+            case SpellType.WinterEmbrace: spellMultiplier = 0.8f; break;
+            case SpellType.SoothingWaters: spellMultiplier = 0.5f; break;
+        }
 
-        // THESIS MECHANIC: If they are in Overtime, strip away all length multipliers!
-        // They only get Base Damage minus the penalty.
+        float finalPotency;
+
+        // THESIS MECHANIC: Overtime vs Normal Cast
         if (isOvertime)
         {
             Debug.Log("<color=orange>Overtime Cast! Length multipliers are disabled.</color>");
             float timeUsed = maxOvertime - currentOvertime; 
             float overtimePercentage = timeUsed / maxOvertime; 
-            float penalty = overtimePercentage * maxPenaltyPercent;
+            float penalty = overtimePercentage * maxPenaltyPercent; // e.g., 0.15
             
-            // Apply the penalty to the base 1.0f potency
-            finalPotency -= penalty;
+            // CORRECT MATH: Reduce the spell's actual power by the penalty percentage!
+            finalPotency = spellMultiplier * (1.0f - penalty); 
         }
         else 
         {
-            // NORMAL TURN: Reward them for their vocabulary!
+            // NORMAL TURN: They keep the Spell Damage AND get the Length Multiplier
+            float lengthMultiplier = 1.0f;
             int len = playerWord.Length;
-            if (len == 3) finalPotency = 0.8f;
-            else if (len >= 4 && len <= 5) finalPotency = 1.0f;
-            else if (len >= 6 && len <= 7) finalPotency = 1.25f;
-            else if (len >= 8) finalPotency = 1.5f;
+            
+            if (len == 3) lengthMultiplier = 0.8f;
+            else if (len >= 4 && len <= 5) lengthMultiplier = 1.0f;
+            else if (len >= 6 && len <= 7) lengthMultiplier = 1.25f;
+            else if (len >= 8) lengthMultiplier = 1.5f;
 
-            // Ultimate Boss Bonus (Only applies if they aren't in overtime!)
+            finalPotency = spellMultiplier * lengthMultiplier;
+
+            // Ultimate Boss Bonus
             if (currentQuest.tier3Rule == Tier3Type.DoubleCast && isWaitingForSecondWord)
             {
-                finalPotency = 2.0f;
+                finalPotency = spellMultiplier * 2.0f; 
             }
         }
 
@@ -809,7 +899,7 @@ public class BattleManager : MonoBehaviour
     IEnumerator HandleResolution()
     {
         // 1. Calculate Damage based on the Potency Math
-        float damageDealt = baseSpellDamage * currentSpellPotency;
+        float damageDealt = baseSpellPotency * currentSpellPotency;
         
         // If they timed out and cast a weak Arcane Bolt, cut it in half!
         if (isLesserSpell) damageDealt *= 0.5f; 
