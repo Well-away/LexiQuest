@@ -13,6 +13,7 @@ public class BattleManager : MonoBehaviour
     public float playerMaxHP = 100f;
     private float playerCurrentHP;
     public Image playerHealthBar; // Drag the Yellow Bar Image here
+    public TextMeshProUGUI playerHPText; // NEW: The text showing Amy's HP
 
     // --- NEW SHIELD VARIABLES ---
     public float playerCurrentShield = 0f;
@@ -21,6 +22,7 @@ public class BattleManager : MonoBehaviour
     public float enemyMaxHP = 300f; // Boss Tier Health!
     private float enemyCurrentHP;
     public Image enemyHealthBar; // Drag the Red Bar Image here
+    public TextMeshProUGUI enemyHPText; // NEW: The text showing the Boss's HP
 
     public float baseSpellPotency = 20f;
     public float enemyBaseDamage = 25f;
@@ -1040,10 +1042,10 @@ public class BattleManager : MonoBehaviour
 
     private void UpdateHealthUI()
     {
-        // 1. Update Boss Health
+        // 1. Update Boss Health Bar
         if (enemyHealthBar != null) enemyHealthBar.fillAmount = enemyCurrentHP / enemyMaxHP;
 
-        // 2. Update Amy's Health & Shield
+        // 2. Update Amy's Health & Shield Bars
         if (playerHealthBar != null && playerShieldBar != null) 
         {
             float hpPercent = playerCurrentHP / playerMaxHP;
@@ -1051,20 +1053,35 @@ public class BattleManager : MonoBehaviour
 
             if (hpPercent + shieldPercent > 1.0f)
             {
-                // OVERSHIELD: The shield overflows the max HP!
-                // We cap the white shield bar at 100%, and visually shrink the yellow HP bar 
-                // so the white shield pushes into it from the right side.
                 playerShieldBar.fillAmount = 1.0f; 
-                
                 float overflowAmount = (hpPercent + shieldPercent) - 1.0f;
                 playerHealthBar.fillAmount = Mathf.Clamp01(hpPercent - overflowAmount); 
             }
             else
             {
-                // NORMAL: The white shield naturally sticks out to the right of the yellow HP
                 playerShieldBar.fillAmount = hpPercent + shieldPercent;
                 playerHealthBar.fillAmount = hpPercent;
             }
+        }
+
+        // 3. NEW: UPDATE THE HP NUMBERS!
+        if (enemyHPText != null)
+        {
+            // CeilToInt prevents weird decimals like "24.6 / 300"
+            enemyHPText.text = Mathf.CeilToInt(enemyCurrentHP).ToString() + " / " + enemyMaxHP.ToString();
+        }
+
+        if (playerHPText != null)
+        {
+            string hpString = Mathf.CeilToInt(playerCurrentHP).ToString() + " / " + playerMaxHP.ToString();
+            
+            // If they have a shield, append it to the text! (e.g., "100 / 100 (+15)")
+            if (playerCurrentShield > 0)
+            {
+                hpString += " (+" + Mathf.CeilToInt(playerCurrentShield).ToString() + ")";
+            }
+            
+            playerHPText.text = hpString;
         }
     }
 
