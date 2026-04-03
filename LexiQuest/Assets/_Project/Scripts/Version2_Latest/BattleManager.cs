@@ -288,6 +288,13 @@ public class BattleManager : MonoBehaviour
         ChangeState(BattleState.QuestIntro);
     }
 
+    // Called by the new "Back" UI Button
+    public void ReturnToCategorySelect()
+    {
+        // Go back to the previous phase!
+        ChangeState(BattleState.CategorySelect);
+    }
+
     // --- PHASE LOGIC ---
 
     IEnumerator HandleIntro()
@@ -308,22 +315,10 @@ public class BattleManager : MonoBehaviour
     IEnumerator HandleCategorySelection()
     {
         if (categorySelectPanel != null) categorySelectPanel.SetActive(true);
-        if (timerPanel != null) timerPanel.SetActive(true); 
+        if (timerPanel != null) timerPanel.SetActive(false); // Turn off the timer UI!
         
-        float currentTimer = selectionTimer;
-
-        while (currentTimer > 0 && currentState == BattleState.CategorySelect)
-        {
-            currentTimer -= Time.deltaTime;
-            UpdateTimerUI(currentTimer, selectionTimer); 
-            yield return null;
-        }
-
-        if (currentTimer <= 0 && currentState == BattleState.CategorySelect)
-        {
-            Debug.Log("Time out! Defaulting to Offensive.");
-            SelectCategory(0); // Auto-pick Offensive (0)
-        }
+        // The game will now just sit here forever until the player clicks a button.
+        yield break; 
     }
 
     public void OnCategorySelected(string category)
@@ -335,22 +330,10 @@ public class BattleManager : MonoBehaviour
     IEnumerator HandleSpellSelection()
     {
         if (spellSelectPanel != null) spellSelectPanel.SetActive(true);
-        if (timerPanel != null) timerPanel.SetActive(true);
-
-        float currentSpellTimer = spellSelectionTimer;
-
-        while (currentSpellTimer > 0 && currentState == BattleState.SpellSelect)
-        {
-            currentSpellTimer -= Time.deltaTime;
-            UpdateTimerUI(currentSpellTimer, spellSelectionTimer); 
-            yield return null;
-        }
-
-        if (currentSpellTimer <= 0 && currentState == BattleState.SpellSelect)
-        {
-            Debug.Log("Time out! Defaulting to the first drafted spell.");
-            SelectDraftedSpell(0); // Auto-pick the first spell slot (0)
-        }
+        if (timerPanel != null) timerPanel.SetActive(false); // Turn off the timer UI!
+        
+        // Wait forever for a button click!
+        yield break; 
     }
 
     public void OnSpellSelected(string spellName)
