@@ -24,7 +24,7 @@ public enum SpellType
     // Offensive
     FlameBlast, FrostSpikes, ThunderStrike, GaleBurst, EarthThrow, ArcaneBolts,
     // Utility
-    WindVeil, FlameBarrier, ManaShield, Restraint,
+    WindVeil, FlameBarrier, ManaShield, Restraint, Focus,
     // Healing
     Revitalize, Cleanse, PurifyingFlames, WinterEmbrace, SoothingWaters
 }
@@ -97,6 +97,7 @@ public class QuestManager : MonoBehaviour
             case SpellType.FlameBarrier: spellRules = new[] { Tier2Type.EndsWith_Y, Tier2Type.EndsWith_E, Tier2Type.EndsWith_LY, Tier2Type.EndsWith_N }; break;
             case SpellType.ManaShield: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
             case SpellType.Restraint: spellRules = new[] { Tier2Type.No_Letter_O, Tier2Type.No_Letter_U, Tier2Type.No_Letter_R, Tier2Type.No_Letter_S, Tier2Type.No_Letter_T, Tier2Type.No_Letter_L }; break;
+            case SpellType.Focus: spellRules = new[] { Tier2Type.MinLength_6, Tier2Type.EndsWith_ING, Tier2Type.No_Letter_A }; break;
 
             // HEALING
             case SpellType.Revitalize: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ING }; break;

@@ -37,13 +37,20 @@ public class BattleManager : MonoBehaviour
     public TextMeshProUGUI scoreText;
     private int enemiesDefeatedCount = 0;
 
-    [Header("Phase 1 & 2 Drafting UI")]
+    [Header("Phase 1 & 2 Spell UI")]
     public GameObject categorySelectPanel;
     public GameObject spellSelectPanel;
-    public TextMeshProUGUI[] draftButtonTexts; // The 3 Text objects for the random spells
+    public Button[] spellButtons; // NEW: The actual Button components so we can lock them!
+    public TextMeshProUGUI[] spellButtonTexts; 
     
     private SpellType activeSpell;
-    private SpellType[] currentlyDraftedSpells = new SpellType[3];
+    private SpellType[] currentlyDisplayedSpells = new SpellType[6]; // Expanded to 6!
+
+    [Header("Cooldown & Status Memory")]
+    public Dictionary<SpellType, int> spellCooldowns = new Dictionary<SpellType, int>();
+    public bool focusActive = false;
+    public float focusDamageBonus = 0f;
+    private int lastWordLength = 0;
 
     [Header("Typing Phase")]
     public TMP_InputField wordInputField;
@@ -179,6 +186,13 @@ public class BattleManager : MonoBehaviour
                 if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
                 break;
             case BattleState.Intro:
+                // Reduce all active cooldowns by 1!
+                List<SpellType> keys = new List<SpellType>(spellCooldowns.Keys);
+                foreach (SpellType key in keys)
+                {
+                    if (spellCooldowns[key] > 0) spellCooldowns[key]--;
+                }
+
                 StartCoroutine(WaitAndChangeState(2f, BattleState.CategorySelect));
                 break;
             case BattleState.CategorySelect:
@@ -244,51 +258,57 @@ public class BattleManager : MonoBehaviour
     public void SelectCategory(int categoryIndex)
     {
         SpellCategory chosenCategory = (SpellCategory)categoryIndex;
-        DraftRandomSpells(chosenCategory);
+        PopulateSpellMenu(chosenCategory);
         ChangeState(BattleState.SpellSelect);
     }
 
-    private void DraftRandomSpells(SpellCategory category)
+    private void PopulateSpellMenu(SpellCategory category)
     {
         List<SpellType> pool = new List<SpellType>();
 
         if (category == SpellCategory.Offensive)
-        {
-            pool = new List<SpellType> { SpellType.FlameBlast, SpellType.FrostSpikes, SpellType.ThunderStrike, SpellType.GaleBurst, SpellType.EarthThrow, SpellType.ArcaneBolts };
-        }
+            pool = new List<SpellType> { SpellType.ArcaneBolts, SpellType.GaleBurst, SpellType.FlameBlast, SpellType.FrostSpikes, SpellType.EarthThrow, SpellType.ThunderStrike };
         else if (category == SpellCategory.Utility)
-        {
-            pool = new List<SpellType> { SpellType.WindVeil, SpellType.FlameBarrier, SpellType.ManaShield, SpellType.Restraint };
-        }
+            pool = new List<SpellType> { SpellType.FlameBarrier, SpellType.WindVeil, SpellType.ManaShield, SpellType.Restraint, SpellType.Focus };
         else if (category == SpellCategory.Healing)
-        {
-            pool = new List<SpellType> { SpellType.Revitalize, SpellType.Cleanse, SpellType.PurifyingFlames, SpellType.WinterEmbrace, SpellType.SoothingWaters };
-        }
+            pool = new List<SpellType> { SpellType.SoothingWaters, SpellType.Cleanse, SpellType.PurifyingFlames, SpellType.Revitalize, SpellType.WinterEmbrace };
 
-        // Shuffle the pool and pick the top 3
-        System.Random rng = new System.Random();
-        pool = pool.OrderBy(x => rng.Next()).ToList();
-
-        for (int i = 0; i < 3; i++)
+        // Loop through all 6 UI buttons
+        for (int i = 0; i < 6; i++)
         {
-            currentlyDraftedSpells[i] = pool[i];
-            if (draftButtonTexts.Length > i && draftButtonTexts[i] != null)
+            if (i < pool.Count)
             {
-                draftButtonTexts[i].text = string.Concat(currentlyDraftedSpells[i].ToString().Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+                spellButtons[i].gameObject.SetActive(true);
+                currentlyDisplayedSpells[i] = pool[i];
+                SpellType s = pool[i];
+
+                // Check cooldowns
+                int cd = spellCooldowns.ContainsKey(s) ? spellCooldowns[s] : 0;
+                spellButtons[i].interactable = (cd == 0); // Lock button if CD > 0
+
+                // Format the text
+                string spellName = string.Concat(s.ToString().Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+                if (cd > 0) spellButtonTexts[i].text = $"{spellName} (CD: {cd})";
+                else spellButtonTexts[i].text = spellName;
+            }
+            else
+            {
+                // Hide extra buttons (e.g., Healing only has 5 spells)
+                spellButtons[i].gameObject.SetActive(false);
             }
         }
     }
 
-    // 3. Player clicks one of the 3 drafted spells
-    public void SelectDraftedSpell(int buttonIndex) // UI Buttons send 0, 1, or 2
+    public void SelectDisplayedSpell(int buttonIndex)
     {
-        activeSpell = currentlyDraftedSpells[buttonIndex];
+        activeSpell = currentlyDisplayedSpells[buttonIndex];
         
         // BUG FIX: Pass 'currentTurn' so the Ultimate Boss mechanic triggers exactly on Turn 5!
         currentQuest = questManager.GenerateQuest(currentTurn, activeSpell); 
         
         ChangeState(BattleState.QuestIntro);
     }
+
 
     // Called by the new "Back" UI Button
     public void ReturnToCategorySelect()
@@ -596,6 +616,8 @@ public class BattleManager : MonoBehaviour
             return; 
         }
 
+        lastWordLength = playerWord.Length; // Save the length for Focus scaling!
+
         // --- POTENCY CALCULATION ---
         
         // 1. ALWAYS get the spell's inherent potency multiplier first!
@@ -655,6 +677,16 @@ public class BattleManager : MonoBehaviour
             {
                 finalPotency = spellMultiplier * 2.0f; 
             }
+        }
+
+        // CONSUME THE FOCUS BUFF!
+        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
+        
+        if (isOffensive && focusActive)
+        {
+            finalPotency *= (1.0f + focusDamageBonus);
+            Debug.Log($"<color=yellow>FOCUS CONSUMED! Damage increased by {focusDamageBonus * 100}%!</color>");
+            focusActive = false; // Consumed!
         }
 
         // Save it so the Resolution state can calculate the final HP reduction!
@@ -892,7 +924,10 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleResolution()
     {
-        // 1. Is it an Offensive Spell?
+        // 1. Put the cast spell on cooldown immediately!
+        spellCooldowns[activeSpell] = GetMaxCooldown(activeSpell);
+
+        // 2. Is it an Offensive Spell?
         bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || 
                             activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || 
                             activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
@@ -928,6 +963,28 @@ public class BattleManager : MonoBehaviour
                 Debug.Log("<color=yellow>Restraint applied! Serpent skips a turn and is weakened by 40%.</color>");
                 enemyTurnSkipCount = 1; 
                 enemyDamageMultiplier = 0.6f; 
+            }
+
+            // --- THESIS MECHANIC: FOCUS ---
+            if (activeSpell == SpellType.Focus)
+            {
+                float bonus = 0.50f; // Base 50% for 4 letters
+                if (lastWordLength == 5) bonus = 0.55f;
+                else if (lastWordLength == 6) bonus = 0.60f;
+                else if (lastWordLength == 7) bonus = 0.65f;
+                else if (lastWordLength >= 8) bonus = 0.75f; // Max 75% for 8+ letters
+
+                focusActive = true;
+                focusDamageBonus = bonus;
+
+                // Reduce all active CDs to 1!
+                List<SpellType> keys = new List<SpellType>(spellCooldowns.Keys);
+                foreach (SpellType key in keys)
+                {
+                    if (spellCooldowns[key] > 1) spellCooldowns[key] = 1;
+                }
+
+                Debug.Log($"<color=yellow>FOCUS CAST! All CDs set to 1. Next attack gains +{bonus * 100}% Potency!</color>");
             }
 
             UpdateHealthUI(); // Update the visual bars instantly!
@@ -1186,5 +1243,28 @@ public class BattleManager : MonoBehaviour
         // If it's an Easy rule, block 2 words. If Medium/Hard, only block 1!
         if (easyRules.Contains(rule)) return 2;
         return 1; 
+    }
+
+    private int GetMaxCooldown(SpellType spell)
+    {
+        switch(spell) {
+            case SpellType.ArcaneBolts: return 0;
+            case SpellType.GaleBurst: return 1;
+            case SpellType.FlameBlast: return 2;
+            case SpellType.FrostSpikes: return 2;
+            case SpellType.EarthThrow: return 3;
+            case SpellType.FlameBarrier: return 2;
+            case SpellType.WindVeil: return 3;
+            case SpellType.SoothingWaters: return 3;
+            case SpellType.Cleanse: return 3;
+            case SpellType.ManaShield: return 4;
+            case SpellType.PurifyingFlames: return 4;
+            case SpellType.ThunderStrike: return 5;
+            case SpellType.Revitalize: return 5;
+            case SpellType.Restraint: return 6;
+            case SpellType.WinterEmbrace: return 6;
+            case SpellType.Focus: return 7;
+            default: return 0;
+        }
     }
 }
