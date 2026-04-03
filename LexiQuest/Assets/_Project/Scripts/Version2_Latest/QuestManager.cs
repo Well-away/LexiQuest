@@ -4,7 +4,7 @@ using System.Linq;
 
 public enum Tier2Type 
 { 
-    ExactLength_4, ExactLength_5, ExactLength_6, ExactLength_7, ExactLength_8,
+    ExactLength_4, ExactLength_5, ExactLength_6, ExactLength_7, ExactLength_8, ExactLength_9,
     MinLength_5, MinLength_6, MinLength_7, MinLength_8,
     EndsWith_S, EndsWith_ED, EndsWith_ER, EndsWith_ING, EndsWith_LY, 
     EndsWith_Y, EndsWith_T, EndsWith_N, EndsWith_E, EndsWith_TION,
@@ -140,6 +140,7 @@ public class QuestManager : MonoBehaviour
             case Tier2Type.ExactLength_6: newQuest.tier2Description = "Exactly 6 letters"; break;
             case Tier2Type.ExactLength_7: newQuest.tier2Description = "Exactly 7 letters"; break;
             case Tier2Type.ExactLength_8: newQuest.tier2Description = "Exactly 8 letters"; break;
+            case Tier2Type.ExactLength_9: newQuest.tier2Description = "Exactly 9 letters"; break;
             case Tier2Type.MinLength_5: newQuest.tier2Description = "5 or more letters"; break;
             case Tier2Type.MinLength_6: newQuest.tier2Description = "6 or more letters"; break;
             case Tier2Type.MinLength_7: newQuest.tier2Description = "7 or more letters"; break;
@@ -184,6 +185,14 @@ public class QuestManager : MonoBehaviour
         if (rule == Tier2Type.No_Letter_S && (prefix == "SH" || prefix == "ST")) return true;
         if (rule == Tier2Type.No_Letter_C && prefix == "CH") return true;
         if (rule == Tier2Type.No_Letter_T && (prefix == "TH" || prefix == "ST")) return true;
+
+        // NEW: Goal 2 - Exclude J, K, and Y from 6+ Exact Length constraints!
+        if (rule == Tier2Type.ExactLength_6 || rule == Tier2Type.ExactLength_7 || 
+            rule == Tier2Type.ExactLength_8 || rule == Tier2Type.ExactLength_9)
+        {
+            if (prefix == "J" || prefix == "K" || prefix == "Y") return true;
+        }
+
         return false; 
     }
 }

@@ -25,6 +25,7 @@ public class BattleManager : MonoBehaviour
     public TextMeshProUGUI enemyHPText; // NEW: The text showing the Boss's HP
 
     public float baseSpellPotency = 20f;
+    private float currentCastBasePotency; // Holds Base + Flat Length Bonus!
     public float enemyBaseDamage = 25f;
     private float currentSpellPotency = 1.0f;
 
@@ -208,6 +209,23 @@ public class BattleManager : MonoBehaviour
                 StartCoroutine(HandleQuestIntro());
                 break;
             case BattleState.Typing:
+                // --- THESIS GOAL 3: DYNAMIC TIMERS ---
+                float calculatedTimer = 30f; // Base time for standard constraints
+                
+                switch(currentQuest.tier2Rule)
+                {
+                    case Tier2Type.ExactLength_4: calculatedTimer = 40f; break; // 30 + 10
+                    case Tier2Type.ExactLength_5: calculatedTimer = 50f; break; // 30 + 20
+                    case Tier2Type.ExactLength_6: calculatedTimer = 60f; break; // 30 + 30
+                    case Tier2Type.ExactLength_7: calculatedTimer = 70f; break; // 30 + 40
+                    case Tier2Type.ExactLength_8: calculatedTimer = 80f; break; // 30 + 50
+                    case Tier2Type.ExactLength_9: calculatedTimer = 90f; break; // 30 + 60
+                }
+
+                // Set your typing timer variables here!
+                maxTypingTime = calculatedTimer;
+                currentTypingTimer = calculatedTimer;
+
                 if (inputArea != null) inputArea.SetActive(true);
                 if (questPanel != null) questPanel.SetActive(true);
                 StartCoroutine(HandleTyping());
@@ -620,11 +638,10 @@ public class BattleManager : MonoBehaviour
 
         // --- POTENCY CALCULATION ---
         
-        // 1. ALWAYS get the spell's inherent potency multiplier first!
+        // 1. Spell Base Multiplier
         float spellMultiplier = 1.0f;
         switch(activeSpell)
         {
-            // OFFENSIVE
             case SpellType.FlameBlast: spellMultiplier = 1.2f; break;
             case SpellType.FrostSpikes: spellMultiplier = 1.3f; break;
             case SpellType.ThunderStrike: spellMultiplier = 2.0f; break;
@@ -632,13 +649,11 @@ public class BattleManager : MonoBehaviour
             case SpellType.EarthThrow: spellMultiplier = 1.5f; break;
             case SpellType.ArcaneBolts: spellMultiplier = 0.75f; break;
             
-            // UTILITY (Base potency mappings until effects are added)
             case SpellType.WindVeil: spellMultiplier = 0.75f; break;
             case SpellType.FlameBarrier: spellMultiplier = 0.5f; break;
             case SpellType.ManaShield: spellMultiplier = 1.5f; break;
-            case SpellType.Restraint: spellMultiplier = 1.0f; break; // Baseline potency for the weaken calculation later
+            case SpellType.Restraint: spellMultiplier = 1.0f; break;
             
-            // HEALING (Base potency mappings until effects are added)
             case SpellType.Revitalize: spellMultiplier = 0.5f; break;
             case SpellType.Cleanse: spellMultiplier = 0.25f; break;
             case SpellType.PurifyingFlames: spellMultiplier = 1.0f; break; 
@@ -646,50 +661,54 @@ public class BattleManager : MonoBehaviour
             case SpellType.SoothingWaters: spellMultiplier = 0.5f; break;
         }
 
-        float finalPotency;
+        // 2. GOAL 1: Flat Potency Bonus Based on Category & Word Length!
+        int len = playerWord.Length;
+        float flatBonus = 0f;
+        
+        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
+        bool isUtility = (activeSpell == SpellType.WindVeil || activeSpell == SpellType.FlameBarrier || activeSpell == SpellType.ManaShield || activeSpell == SpellType.Restraint || activeSpell == SpellType.Focus);
+        bool isHealing = (activeSpell == SpellType.Revitalize || activeSpell == SpellType.Cleanse || activeSpell == SpellType.PurifyingFlames || activeSpell == SpellType.WinterEmbrace || activeSpell == SpellType.SoothingWaters);
 
-        // THESIS MECHANIC: Overtime vs Normal Cast
+        // e.g. 5 letter Offensive word = 5 * 2 = +10 Potency to the base stat!
+        if (isOffensive && len >= 3) flatBonus = len * 2f;
+        else if (isUtility && len >= 4) flatBonus = len * 3f;
+        else if (isHealing && len >= 5) flatBonus = len * 4f;
+
+        currentCastBasePotency = baseSpellPotency + flatBonus; // Save this for HandleResolution!
+
+        // 3. GOAL 2: Exact Length Constraint Multipliers
+        float constraintMultiplier = 1.0f;
+        switch(currentQuest.tier2Rule)
+        {
+            case Tier2Type.ExactLength_4: constraintMultiplier = 1.30f; break; // +30%
+            case Tier2Type.ExactLength_5: constraintMultiplier = 1.35f; break; // +35%
+            case Tier2Type.ExactLength_6: constraintMultiplier = 1.40f; break; // +40%
+            case Tier2Type.ExactLength_7: constraintMultiplier = 1.45f; break; // +45%
+            case Tier2Type.ExactLength_8: constraintMultiplier = 1.50f; break; // +50%
+            case Tier2Type.ExactLength_9: constraintMultiplier = 1.60f; break; // +60%
+        }
+
+        float finalPotency = spellMultiplier * constraintMultiplier;
+
+        // 4. Overtime Penalty
         if (isOvertime)
         {
-            Debug.Log("<color=orange>Overtime Cast! Length multipliers are disabled.</color>");
+            Debug.Log("<color=orange>Overtime Cast! Suffered a time penalty!</color>");
             float timeUsed = maxOvertime - currentOvertime; 
             float overtimePercentage = timeUsed / maxOvertime; 
-            float penalty = overtimePercentage * maxPenaltyPercent; // e.g., 0.15
+            float penalty = overtimePercentage * maxPenaltyPercent;
             
-            // CORRECT MATH: Reduce the spell's actual power by the penalty percentage!
-            finalPotency = spellMultiplier * (1.0f - penalty); 
-        }
-        else 
-        {
-            // NORMAL TURN: They keep the Spell Damage AND get the Length Multiplier
-            float lengthMultiplier = 1.0f;
-            int len = playerWord.Length;
-            
-            if (len == 3) lengthMultiplier = 0.8f;
-            else if (len >= 4 && len <= 5) lengthMultiplier = 1.0f;
-            else if (len >= 6 && len <= 7) lengthMultiplier = 1.25f;
-            else if (len >= 8) lengthMultiplier = 1.5f;
-
-            finalPotency = spellMultiplier * lengthMultiplier;
-
-            // Ultimate Boss Bonus
-            if (currentQuest.tier3Rule == Tier3Type.DoubleCast && isWaitingForSecondWord)
-            {
-                finalPotency = spellMultiplier * 2.0f; 
-            }
+            finalPotency *= (1.0f - penalty); 
         }
 
-        // CONSUME THE FOCUS BUFF!
-        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
-        
+        // 5. Consume Focus Buff
         if (isOffensive && focusActive)
         {
             finalPotency *= (1.0f + focusDamageBonus);
             Debug.Log($"<color=yellow>FOCUS CONSUMED! Damage increased by {focusDamageBonus * 100}%!</color>");
-            focusActive = false; // Consumed!
+            focusActive = false; 
         }
 
-        // Save it so the Resolution state can calculate the final HP reduction!
         currentSpellPotency = finalPotency;
 
         // ==========================================
@@ -935,7 +954,8 @@ public class BattleManager : MonoBehaviour
         if (isOffensive)
         {
             // OFFENSIVE MATH: Deal Damage!
-            float damageDealt = baseSpellPotency * currentSpellPotency;
+            // NEW: Use the dynamic base potency that includes the word length bonus!
+            float damageDealt = currentCastBasePotency * currentSpellPotency;
             if (isLesserSpell) damageDealt *= 0.5f; 
 
             enemyCurrentHP -= damageDealt;
@@ -952,7 +972,8 @@ public class BattleManager : MonoBehaviour
             // --- THESIS MECHANIC: SHIELDS ---
             if (activeSpell == SpellType.WindVeil || activeSpell == SpellType.FlameBarrier || activeSpell == SpellType.ManaShield)
             {
-                float shieldAmount = baseSpellPotency * currentSpellPotency;
+                // NEW: Shields now scale with the flat length bonus!
+                float shieldAmount = currentCastBasePotency * currentSpellPotency;
                 playerCurrentShield += shieldAmount; // Stack the shield!
                 Debug.Log($"<color=cyan>Shield Applied! Amy gains {shieldAmount} Shield. Total Shield: {playerCurrentShield}</color>");
             }

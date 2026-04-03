@@ -20,6 +20,7 @@ public static class QuestValidator
             case Tier2Type.ExactLength_6: return len == 6;
             case Tier2Type.ExactLength_7: return len == 7;
             case Tier2Type.ExactLength_8: return len == 8;
+            case Tier2Type.ExactLength_9: return len == 9;
             case Tier2Type.MinLength_5: return len >= 5;
             case Tier2Type.MinLength_6: return len >= 6;
             case Tier2Type.MinLength_7: return len >= 7;
