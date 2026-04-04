@@ -122,6 +122,13 @@ public class BattleManager : MonoBehaviour
     public int enemyTurnSkipCount = 0;
     public float enemyDamageMultiplier = 1.0f;
 
+    [Header("Player Status Effects")]
+    public float playerHoTAmount = 0f;       // How much she heals per turn
+    public int playerHoTTurns = 0;           // How many turns the heal lasts
+    public int incomingHealBonusTurns = 0;   // Revitalize +50% Healing Buff
+    public bool isDamageImmune = false;      // Winter Embrace Invincibility
+    public int playerDebuffCount = 0;        // Cleanse Debuff Tracker (Placeholder until enemies debuff you!)
+
     void Start()
     {
         if (inputArea != null)
@@ -193,6 +200,23 @@ public class BattleManager : MonoBehaviour
                 {
                     if (spellCooldowns[key] > 0) spellCooldowns[key]--;
                 }
+
+                // --- PROCESS HOTS (Heal Over Time) ---
+                if (playerHoTTurns > 0)
+                {
+                    float tickHeal = playerHoTAmount;
+                    if (incomingHealBonusTurns > 0) tickHeal *= 1.5f; // Revitalize bonus
+
+                    playerCurrentHP += tickHeal;
+                    if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP;
+                    
+                    playerHoTTurns--;
+                    UpdateHealthUI();
+                    Debug.Log($"<color=green>HoT Tick! Amy healed {tickHeal} HP. {playerHoTTurns} turns of HoT remaining.</color>");
+                }
+
+                if (incomingHealBonusTurns > 0) incomingHealBonusTurns--;
+                isDamageImmune = false; // Immunity expires at the start of Amy's next turn!
 
                 StartCoroutine(WaitAndChangeState(2f, BattleState.CategorySelect));
                 break;
@@ -850,7 +874,10 @@ public class BattleManager : MonoBehaviour
                 bool t2Passed = QuestValidator.CheckTier2(playerWord, currentQuest.tier2Rule);
                 if (t2Passed)
                 {
-                    Debug.Log($"<color=cyan>DOUBLE CAST SUCCESS! Ultimate Spell Activated at {(finalPotency * 100).ToString("F1")}% Power!</color>");
+                    // NEW: Apply the 200% Damage Multiplier for successfully Double Casting!
+                    currentSpellPotency *= 2.0f; 
+
+                    Debug.Log($"<color=cyan>DOUBLE CAST SUCCESS! Ultimate Spell Activated at {(currentSpellPotency * 100).ToString("F1")}% Power!</color>");
                     
                     // Save ONLY the second word for the next turn's spam filter
                     RecordSuccessfulWord(playerWord, currentQuest.targetLetter); 
@@ -1008,6 +1035,62 @@ public class BattleManager : MonoBehaviour
                 Debug.Log($"<color=yellow>FOCUS CAST! All CDs set to 1. Next attack gains +{bonus * 100}% Potency!</color>");
             }
 
+            // --- THESIS MECHANIC: HEALING SPELLS ---
+            float immediateHeal = 0f;
+
+            if (activeSpell == SpellType.Revitalize)
+            {
+                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.5f;
+                playerHoTTurns = 3;
+                incomingHealBonusTurns = 2; 
+                Debug.Log($"<color=green>Revitalize! Regen {playerHoTAmount} HP for 3 turns. Incoming healing +50% for 2 turns.</color>");
+            }
+            else if (activeSpell == SpellType.Cleanse)
+            {
+                // Dispel all debuffs and heal 0.25x per debuff
+                // NOTE: We assume 1 debuff here just so it actually heals during prototype testing!
+                int dispelled = (playerDebuffCount > 0) ? playerDebuffCount : 1; 
+                immediateHeal = currentCastBasePotency * currentSpellPotency * 0.25f * dispelled;
+                playerDebuffCount = 0;
+                Debug.Log($"<color=green>Cleanse! Dispelled {dispelled} debuffs and healed {immediateHeal} HP.</color>");
+            }
+            else if (activeSpell == SpellType.PurifyingFlames)
+            {
+                float selfDamage = currentCastBasePotency * currentSpellPotency * 0.75f;
+                playerCurrentHP -= selfDamage;
+                if (playerCurrentHP < 0) playerCurrentHP = 0;
+                
+                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 1.0f;
+                playerHoTTurns = 2;
+                Debug.Log($"<color=green>Purifying Flames! Took {selfDamage} damage. Will heal {playerHoTAmount} HP for 2 turns.</color>");
+            }
+            else if (activeSpell == SpellType.WinterEmbrace)
+            {
+                isDamageImmune = true; // Protects Amy from the Boss's attack this turn!
+                immediateHeal = currentCastBasePotency * currentSpellPotency * 0.8f;
+                
+                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.8f;
+                playerHoTTurns = 1; // Heals again next turn
+                Debug.Log($"<color=green>Winter Embrace! Damage Immunity Active. Healed {immediateHeal} HP. Will heal again next turn.</color>");
+            }
+            else if (activeSpell == SpellType.SoothingWaters)
+            {
+                immediateHeal = currentCastBasePotency * currentSpellPotency * 0.5f;
+                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.15f;
+                playerHoTTurns = 2;
+                Debug.Log($"<color=green>Soothing Waters! Healed {immediateHeal} HP. Regen {playerHoTAmount} HP for 2 turns.</color>");
+            }
+
+            // APPLY THE IMMEDIATE HEAL TO AMY'S HEALTH BAR
+            if (immediateHeal > 0)
+            {
+                if (incomingHealBonusTurns > 0) immediateHeal *= 1.5f; // Apply Revitalize Bonus if active
+                
+                playerCurrentHP += immediateHeal;
+                if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP; // Prevent overhealing max HP
+                Debug.Log($"<color=green>Amy recovered HP! Current HP: {playerCurrentHP}</color>");
+            }
+
             UpdateHealthUI(); // Update the visual bars instantly!
         }
 
@@ -1051,6 +1134,13 @@ public class BattleManager : MonoBehaviour
         // Calculate damage taking any active weakness multipliers into account
         float finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
         enemyDamageMultiplier = 1.0f; // Reset weakness immediately
+
+        // NEW: IMMUNITY CHECK (Winter Embrace)
+        if (isDamageImmune)
+        {
+            Debug.Log("<color=cyan>Winter Embrace deflects the attack! Amy takes 0 damage.</color>");
+            finalEnemyDamage = 0;
+        }
 
         // 1. SHIELD ABSORPTION MATH
         if (playerCurrentShield > 0)
