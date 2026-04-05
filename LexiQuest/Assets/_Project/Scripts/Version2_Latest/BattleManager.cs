@@ -754,6 +754,7 @@ public class BattleManager : MonoBehaviour
         if (isOffensive && focusActive)
         {
             finalPotency *= (1.0f + focusDamageBonus);
+            Debug.Log($"<color=yellow>FOCUS CONSUMED! Damage increased by {focusDamageBonus * 100}%!</color>");
             focusActive = false; 
         }
 
@@ -762,12 +763,13 @@ public class BattleManager : MonoBehaviour
         // ==========================================
         // THESIS GOAL 3: WORD DISCOVERY BONUS
         // ==========================================
-        if (dictionaryManager != null && !isOvertime) // (Optional: Don't give bonus if they are in overtime!)
+        if (dictionaryManager != null && !isOvertime) 
         {
             float discoveryBonus = dictionaryManager.RegisterWordAndGetBonus(playerWord);
             if (discoveryBonus > 1.0f)
             {
-                Debug.Log($"<color=yellow>✨ DISCOVERY BONUS! '{playerWord}' grants 1.20x Damage! ✨</color>");
+                // UPDATED: Now says "Potency" instead of "Damage"!
+                Debug.Log($"<color=yellow>✨ DISCOVERY BONUS! '{playerWord}' grants 1.20x Potency! ✨</color>");
                 currentSpellPotency *= discoveryBonus;
             }
         }

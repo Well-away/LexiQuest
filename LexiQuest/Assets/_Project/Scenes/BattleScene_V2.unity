@@ -7135,8 +7135,9 @@ MonoBehaviour:
   enemyMaxHP: 300
   enemyHealthBar: {fileID: 1804618093}
   enemyHPText: {fileID: 1357849485}
-  baseSpellPotency: 20
+  baseSpellPotency: 10
   enemyBaseDamage: 25
+  questStreak: 0
   mainUICanvas: {fileID: 1605563992}
   mainMenuPanel: {fileID: 944930350}
   gameOverPanel: {fileID: 493194700}
