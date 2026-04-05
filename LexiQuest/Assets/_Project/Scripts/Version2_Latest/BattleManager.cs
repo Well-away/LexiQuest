@@ -120,16 +120,25 @@ public class BattleManager : MonoBehaviour
     [Header("Spell States")]
     public bool isLesserSpell = false;
 
-    [Header("Status Effects")]
+    [Header("Status Effects (Enemy)")]
     public int enemyTurnSkipCount = 0;
-    public float enemyDamageMultiplier = 1.0f;
+    public float enemyDamageMultiplier = 1.0f; // Electrified / Restraint
+    public float enemyVulnerability = 1.0f;    // Frostbite
+    public float enemyBurnAmount = 0f;
+    public int enemyBurnTurns = 0;
+    public TextMeshProUGUI enemyStatusText; // NEW: Drag a Text component here for the UI!
 
     [Header("Player Status Effects")]
-    public float playerHoTAmount = 0f;       // How much she heals per turn
-    public int playerHoTTurns = 0;           // How many turns the heal lasts
-    public int incomingHealBonusTurns = 0;   // Revitalize +50% Healing Buff
-    public bool isDamageImmune = false;      // Winter Embrace Invincibility
-    public int playerDebuffCount = 0;        // Cleanse Debuff Tracker (Placeholder until enemies debuff you!)
+    public float playerHoTAmount = 0f;       
+    public int playerHoTTurns = 0;           
+    public int incomingHealBonusTurns = 0;   
+    public bool isDamageImmune = false;      
+    public int playerDebuffCount = 0;        
+    public float playerDamageReduction = 0f; // Gale Burst / Wind Veil flat block!
+    public int playerDamageReductionTurns = 0;
+    public float flameBarrierBurnAmount = 0f; // Retaliation burn
+    public int flameBarrierTurns = 0;
+    public TextMeshProUGUI playerStatusText; // NEW: Drag a Text component here for the UI!
 
     void Start()
     {
@@ -924,14 +933,51 @@ public class BattleManager : MonoBehaviour
 
         if (isOffensive)
         {
-            // OFFENSIVE MATH: Deal Damage!
-            // NEW: Use the dynamic base potency that includes the word length bonus!
+            // --- OFFENSIVE SPELL EFFECTS ---
             float damageDealt = currentCastBasePotency * currentSpellPotency;
+            
+            // Arcane Bolts: 15% Chance to Crit!
+            if (activeSpell == SpellType.ArcaneBolts)
+            {
+                if (Random.value <= 0.15f)
+                {
+                    damageDealt *= 1.2f;
+                    Debug.Log("<color=yellow>CRITICAL STRIKE! Arcane Bolts deals 1.2x damage!</color>");
+                }
+            }
+
             if (isLesserSpell) damageDealt *= 0.5f; 
+
+            // Apply Frostbite Vulnerability!
+            damageDealt *= enemyVulnerability; 
 
             enemyCurrentHP -= damageDealt;
             if (enemyCurrentHP < 0) enemyCurrentHP = 0;
             
+            // Apply Status Effects
+            if (activeSpell == SpellType.FlameBlast)
+            {
+                enemyBurnAmount = currentCastBasePotency * currentSpellPotency * 0.15f;
+                enemyBurnTurns = 3;
+                Debug.Log($"<color=red>Flame Blast applied Burn! Enemy will take {enemyBurnAmount} damage for 3 turns.</color>");
+            }
+            else if (activeSpell == SpellType.FrostSpikes)
+            {
+                enemyVulnerability = 1.2f; // 20% increased damage taken
+                Debug.Log("<color=cyan>Frost Spikes applied Frostbite! Enemy takes 20% more damage.</color>");
+            }
+            else if (activeSpell == SpellType.ThunderStrike)
+            {
+                enemyDamageMultiplier = 0.8f; // 20% less damage dealt
+                Debug.Log("<color=yellow>Thunder Strike applied Electrified! Enemy deals 20% less damage.</color>");
+            }
+            else if (activeSpell == SpellType.GaleBurst)
+            {
+                playerDamageReduction = currentCastBasePotency * currentSpellPotency * 0.25f;
+                playerDamageReductionTurns = 1;
+                Debug.Log($"<color=white>Gale Burst! Next incoming damage reduced by {playerDamageReduction} flat potency.</color>");
+            }
+
             UpdateHealthUI();
             Debug.Log($"<color=cyan>Offensive Spell: {activeSpell} | Power: {currentSpellPotency}x | Damage: {damageDealt} | Serpent HP: {enemyCurrentHP}</color>");
         }
@@ -940,13 +986,24 @@ public class BattleManager : MonoBehaviour
             // UTILITY & HEALING MATH: Do not deal damage!
             Debug.Log($"<color=cyan>Cast Non-Offensive Spell: {activeSpell} at {currentSpellPotency}x Potency!</color>");
             
-            // --- THESIS MECHANIC: SHIELDS ---
-            if (activeSpell == SpellType.WindVeil || activeSpell == SpellType.FlameBarrier || activeSpell == SpellType.ManaShield)
+            // --- THESIS MECHANIC: UTILITY EFFECTS ---
+            if (activeSpell == SpellType.WindVeil)
             {
-                // NEW: Shields now scale with the flat length bonus!
+                playerDamageReduction = currentCastBasePotency * currentSpellPotency * 0.40f;
+                playerDamageReductionTurns = 2;
+                Debug.Log($"<color=white>Wind Veil! Incoming damage reduced by {playerDamageReduction} flat potency for 2 turns.</color>");
+            }
+            else if (activeSpell == SpellType.FlameBarrier)
+            {
+                flameBarrierBurnAmount = currentCastBasePotency * currentSpellPotency * 0.25f;
+                flameBarrierTurns = 2;
+                Debug.Log($"<color=red>Flame Barrier! Attackers will be burned for {flameBarrierBurnAmount} damage for 2 turns.</color>");
+            }
+            else if (activeSpell == SpellType.ManaShield) // Kept Mana Shield as a standard shield
+            {
                 float shieldAmount = currentCastBasePotency * currentSpellPotency;
-                playerCurrentShield += shieldAmount; // Stack the shield!
-                Debug.Log($"<color=cyan>Shield Applied! Amy gains {shieldAmount} Shield. Total Shield: {playerCurrentShield}</color>");
+                playerCurrentShield += shieldAmount; 
+                Debug.Log($"<color=cyan>Mana Shield Applied! Amy gains {shieldAmount} Shield.</color>");
             }
 
             // --- THESIS MECHANIC: RESTRAINT ---
@@ -1059,67 +1116,116 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleEnemyTurn()
     {
-        // --- CHECK STATUS EFFECTS FIRST ---
+        // 1. TICK ENEMY STATUS EFFECTS
+        if (enemyBurnTurns > 0)
+        {
+            enemyCurrentHP -= enemyBurnAmount;
+            enemyBurnTurns--;
+            Debug.Log($"<color=red>Enemy takes {enemyBurnAmount} Burn damage! Turns left: {enemyBurnTurns}</color>");
+            if (enemyCurrentHP <= 0) 
+            {
+                // Died to burn!
+                UpdateHealthUI();
+                ChangeState(BattleState.QuestIntro);
+                yield break;
+            }
+        }
+
         if (enemyTurnSkipCount > 0)
         {
             Debug.Log("<color=cyan>The Wind Serpent is Restrained and cannot attack this turn!</color>");
-            enemyTurnSkipCount--; // Decrease the skip counter
-            yield return new WaitForSeconds(2.0f); // Pause so the player can read it!
-            
-            // Loop back to Amy's turn immediately!
+            enemyTurnSkipCount--; 
+            yield return new WaitForSeconds(2.0f); 
             currentTurn++;
             ChangeState(BattleState.Intro);
             yield break;
         }
 
-        // --- NORMAL ENEMY ATTACK ---
-        Debug.Log("<color=red>Wind Serpent attacks!</color>");
+        // 2. WIND SERPENT AI (Light Attack, Heavy Attack, Heal)
+        int aiChoice = Random.Range(0, 100);
+        float finalEnemyDamage = 0f;
         
-        // Calculate damage taking any active weakness multipliers into account
-        float finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
-        enemyDamageMultiplier = 1.0f; // Reset weakness immediately
-
-        // NEW: IMMUNITY CHECK (Winter Embrace)
-        if (isDamageImmune)
+        if (aiChoice < 20) // 20% Chance: Defensive Heal
         {
-            Debug.Log("<color=cyan>Winter Embrace deflects the attack! Amy takes 0 damage.</color>");
-            finalEnemyDamage = 0;
+            float healAmount = enemyMaxHP * 0.1f; // Heals 10% of Max HP
+            enemyCurrentHP += healAmount;
+            if (enemyCurrentHP > enemyMaxHP) enemyCurrentHP = enemyMaxHP;
+            Debug.Log($"<color=green>Wind Serpent uses Mending Winds! Heals for {healAmount} HP.</color>");
+        }
+        else if (aiChoice < 50) // 30% Chance: Heavy Attack
+        {
+            Debug.Log("<color=red>Wind Serpent uses Raging Tempest! (Heavy Attack)</color>");
+            finalEnemyDamage = (enemyBaseDamage * 1.5f) * enemyDamageMultiplier;
+        }
+        else // 50% Chance: Light Attack
+        {
+            Debug.Log("<color=red>Wind Serpent uses Sonic Tail! (Light Attack)</color>");
+            finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
         }
 
-        // 1. SHIELD ABSORPTION MATH
-        if (playerCurrentShield > 0)
-        {
-            if (playerCurrentShield >= finalEnemyDamage)
-            {
-                // The shield survives the hit!
-                playerCurrentShield -= finalEnemyDamage;
-                Debug.Log($"<color=cyan>Shield absorbed all {finalEnemyDamage} damage! Shield remaining: {playerCurrentShield}</color>");
-                finalEnemyDamage = 0; // No damage left to hit Amy
-            }
-            else
-            {
-                // The shield shatters, and the leftover damage bleeds through!
-                Debug.Log($"<color=cyan>Shield absorbed {playerCurrentShield} damage and shattered!</color>");
-                finalEnemyDamage -= playerCurrentShield;
-                playerCurrentShield = 0; // Shield is gone
-            }
-        }
+        // Reset weakness/vuln at the end of its turn (unless it's permanent until cleansed)
+        enemyDamageMultiplier = 1.0f; 
+        enemyVulnerability = 1.0f; // Frostbite wears off after it takes its turn
 
-        // 2. APPLY LEFTOVER DAMAGE TO AMY'S HP
+        // 3. APPLY DAMAGE TO AMY
         if (finalEnemyDamage > 0)
         {
-            playerCurrentHP -= finalEnemyDamage;
-            if (playerCurrentHP < 0) playerCurrentHP = 0;
-            Debug.Log($"<color=orange>Serpent hits Amy for {finalEnemyDamage} damage! Amy HP: {playerCurrentHP}</color>");
+            // A. Check Immunity
+            if (isDamageImmune)
+            {
+                Debug.Log("<color=cyan>Winter Embrace deflects the attack! Amy takes 0 damage.</color>");
+                finalEnemyDamage = 0;
+            }
+
+            // B. Apply Flat Damage Reduction (Gale Burst / Wind Veil)
+            if (playerDamageReductionTurns > 0)
+            {
+                finalEnemyDamage -= playerDamageReduction;
+                if (finalEnemyDamage < 0) finalEnemyDamage = 0;
+                playerDamageReductionTurns--;
+                Debug.Log($"<color=white>Damage reduced by {playerDamageReduction}! Final incoming damage: {finalEnemyDamage}</color>");
+            }
+
+            // C. Shield & HP Math
+            if (finalEnemyDamage > 0)
+            {
+                if (playerCurrentShield > 0)
+                {
+                    if (playerCurrentShield >= finalEnemyDamage)
+                    {
+                        playerCurrentShield -= finalEnemyDamage;
+                        finalEnemyDamage = 0; 
+                    }
+                    else
+                    {
+                        finalEnemyDamage -= playerCurrentShield;
+                        playerCurrentShield = 0; 
+                    }
+                }
+
+                if (finalEnemyDamage > 0)
+                {
+                    playerCurrentHP -= finalEnemyDamage;
+                    if (playerCurrentHP < 0) playerCurrentHP = 0;
+                    Debug.Log($"<color=orange>Serpent hits Amy for {finalEnemyDamage} damage! Amy HP: {playerCurrentHP}</color>");
+                }
+            }
+
+            // D. Flame Barrier Retaliation!
+            if (flameBarrierTurns > 0)
+            {
+                enemyBurnAmount = flameBarrierBurnAmount;
+                enemyBurnTurns = 2; // Ignites the enemy!
+                flameBarrierTurns--;
+                Debug.Log($"<color=red>Flame Barrier triggered! Enemy ignited for {enemyBurnAmount} damage for 2 turns.</color>");
+            }
         }
 
-        UpdateHealthUI(); // Update the visual yellow and white bars!
-
+        UpdateHealthUI();
         yield return new WaitForSeconds(3.0f);
 
         if (playerCurrentHP <= 0)
         {
-            Debug.Log("<color=red>Amy has fallen...</color>");
             ChangeState(BattleState.GameOver);
             yield break;
         }
@@ -1194,6 +1300,27 @@ public class BattleManager : MonoBehaviour
             }
             
             playerHPText.text = hpString;
+        }
+
+        // Update Status Texts
+        if (enemyStatusText != null)
+        {
+            string eStatus = "";
+            if (enemyBurnTurns > 0) eStatus += $"Burn ({enemyBurnTurns}) ";
+            if (enemyVulnerability > 1.0f) eStatus += "Frostbite ";
+            if (enemyDamageMultiplier < 1.0f) eStatus += "Electrified ";
+            enemyStatusText.text = eStatus;
+        }
+
+        if (playerStatusText != null)
+        {
+            string pStatus = "";
+            if (playerHoTTurns > 0) pStatus += $"Regen ({playerHoTTurns}) ";
+            if (playerDamageReductionTurns > 0) pStatus += $"WindVeil ({playerDamageReductionTurns}) ";
+            if (flameBarrierTurns > 0) pStatus += $"FlameBar ({flameBarrierTurns}) ";
+            if (isDamageImmune) pStatus += "Immune! ";
+            if (focusActive) pStatus += "Focused! ";
+            playerStatusText.text = pStatus;
         }
     }
 
@@ -1304,21 +1431,23 @@ public class BattleManager : MonoBehaviour
     {
         switch(spell) {
             case SpellType.ArcaneBolts: return 0;
-            case SpellType.GaleBurst: return 1;
-            case SpellType.FlameBlast: return 2;
-            case SpellType.FrostSpikes: return 2;
-            case SpellType.EarthThrow: return 3;
-            case SpellType.FlameBarrier: return 2;
-            case SpellType.WindVeil: return 3;
-            case SpellType.SoothingWaters: return 3;
-            case SpellType.Cleanse: return 3;
-            case SpellType.ManaShield: return 4;
-            case SpellType.PurifyingFlames: return 4;
-            case SpellType.ThunderStrike: return 5;
-            case SpellType.Revitalize: return 5;
-            case SpellType.Restraint: return 6;
-            case SpellType.WinterEmbrace: return 6;
-            case SpellType.Focus: return 7;
+            case SpellType.GaleBurst: return 2;      // Up from 1
+            case SpellType.FlameBlast: return 3;     // Up from 2
+            case SpellType.EarthThrow: return 4;     // Thunder Strike Lite
+            case SpellType.FrostSpikes: return 4;    // Up from 2 (Frostbite is strong!)
+            case SpellType.ThunderStrike: return 6;  // Up from 5
+            
+            case SpellType.FlameBarrier: return 3;   // Up from 2
+            case SpellType.WindVeil: return 4;       // Up from 3
+            case SpellType.ManaShield: return 5;     // Up from 4
+            case SpellType.Focus: return 8;          // Up from 7
+            case SpellType.Restraint: return 7;      // Up from 6
+            
+            case SpellType.SoothingWaters: return 4; // Up from 3
+            case SpellType.Cleanse: return 4;        // Up from 3
+            case SpellType.PurifyingFlames: return 5;// Up from 4
+            case SpellType.Revitalize: return 6;     // Up from 5
+            case SpellType.WinterEmbrace: return 7;  // Up from 6
             default: return 0;
         }
     }
