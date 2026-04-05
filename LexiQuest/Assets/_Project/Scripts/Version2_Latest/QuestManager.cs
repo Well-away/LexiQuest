@@ -4,6 +4,7 @@ using System.Linq;
 
 public enum Tier2Type 
 { 
+    None, // NEW: Added for Arcane Bolts!
     ExactLength_4, ExactLength_5, ExactLength_6, ExactLength_7, ExactLength_8, ExactLength_9,
     MinLength_5, MinLength_6, MinLength_7, MinLength_8,
     EndsWith_S, EndsWith_ED, EndsWith_ER, EndsWith_ING, EndsWith_LY, 
@@ -90,7 +91,7 @@ public class QuestManager : MonoBehaviour
             case SpellType.ThunderStrike: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
             case SpellType.GaleBurst: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER }; break;
             case SpellType.EarthThrow: spellRules = new[] { Tier2Type.No_Letter_U, Tier2Type.No_Letter_O, Tier2Type.No_Letter_C, Tier2Type.No_Letter_P }; break;
-            case SpellType.ArcaneBolts: spellRules = new[] { Tier2Type.EndsWith_TION, Tier2Type.EndsWith_Y, Tier2Type.EndsWith_S, Tier2Type.EndsWith_ER, Tier2Type.EndsWith_LY }; break;
+            case SpellType.ArcaneBolts: spellRules = new[] { Tier2Type.None }; break;
             
             // UTILITY
             case SpellType.WindVeil: spellRules = new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_O, Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_N }; break;
@@ -135,6 +136,7 @@ public class QuestManager : MonoBehaviour
 
         switch (newQuest.tier2Rule)
         {
+            case Tier2Type.None: newQuest.tier2Description = "No secondary constraint"; break;
             case Tier2Type.ExactLength_4: newQuest.tier2Description = "Exactly 4 letters"; break;
             case Tier2Type.ExactLength_5: newQuest.tier2Description = "Exactly 5 letters"; break;
             case Tier2Type.ExactLength_6: newQuest.tier2Description = "Exactly 6 letters"; break;

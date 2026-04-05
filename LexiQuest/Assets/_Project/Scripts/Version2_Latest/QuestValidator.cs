@@ -14,6 +14,9 @@ public static class QuestValidator
 
         switch (rule)
         {
+            // --- NO SECONDARY QUEST ---
+            case Tier2Type.None: return true; // Always passes!
+
             // --- SHAPES & SIZES ---
             case Tier2Type.ExactLength_4: return len == 4;
             case Tier2Type.ExactLength_5: return len == 5;

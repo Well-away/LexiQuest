@@ -24,10 +24,12 @@ public class BattleManager : MonoBehaviour
     public Image enemyHealthBar; // Drag the Red Bar Image here
     public TextMeshProUGUI enemyHPText; // NEW: The text showing the Boss's HP
 
-    public float baseSpellPotency = 20f;
+    public float baseSpellPotency = 10f; // REDUCED TO 10
     private float currentCastBasePotency; // Holds Base + Flat Length Bonus!
     public float enemyBaseDamage = 25f;
     private float currentSpellPotency = 1.0f;
+    
+    public int questStreak = 0; // NEW: Tracks consecutive double-quest completions!
 
     [Header("Cinematic UI Toggles")]
     public GameObject mainUICanvas; // Drag the "Canvas" inside LexiQuestUIV2 here
@@ -366,7 +368,7 @@ public class BattleManager : MonoBehaviour
         introBanner.SetActive(true);
         
         // Actually set the text instead of just commenting it!
-        bannerText.text = "IT'S OUR TURN!"; 
+        bannerText.text = "IT's YOUR TURN!"; 
         
         yield return StartCoroutine(WaitOrSkip(1.5f));
         
@@ -410,12 +412,14 @@ public class BattleManager : MonoBehaviour
     {
         
         introBanner.SetActive(true);
-        bannerText.text = "QUEST: Word starting with '" + currentQuest.targetLetter + "'";
-        yield return StartCoroutine(WaitOrSkip(3f));
+        bannerText.text = "QUEST 1: Starts with '" + currentQuest.targetLetter + "'";
+        yield return StartCoroutine(WaitOrSkip(2.5f));
 
-        
-        bannerText.text = "SIDE QUEST: " + currentQuest.tier2Description;
-        yield return StartCoroutine(WaitOrSkip(3f));
+        if (currentQuest.tier2Rule != Tier2Type.None)
+        {
+            bannerText.text = "QUEST 2: " + currentQuest.tier2Description;
+            yield return StartCoroutine(WaitOrSkip(2.5f));
+        }
 
         // ==========================================
         // 3. NEW: THE DYNAMIC BLOCKED WORDS BANNER
@@ -660,9 +664,34 @@ public class BattleManager : MonoBehaviour
 
         lastWordLength = playerWord.Length; // Save the length for Focus scaling!
 
-        // --- POTENCY CALCULATION ---
+        // ==========================================
+        // THESIS MECHANIC: OPTIONAL QUESTS & STREAKS
+        // ==========================================
         
-        // 1. Spell Base Multiplier
+        int questsCompleted = 0;
+        bool passedQ1 = playerWord.StartsWith(currentQuest.targetLetter);
+        bool passedQ2 = QuestValidator.CheckTier2(playerWord, currentQuest.tier2Rule);
+
+        if (passedQ1) questsCompleted++;
+        
+        // Arcane bolts has no Q2, so it maxes out at 1 quest completed!
+        if (passedQ2 && currentQuest.tier2Rule != Tier2Type.None) questsCompleted++;
+
+        // Calculate Streak! (Only triggers if they complete BOTH quests)
+        if (questsCompleted == 2)
+        {
+            questStreak++;
+            Debug.Log($"<color=green>Perfect Cast! Quest Streak: {questStreak}</color>");
+        }
+        else
+        {
+            questStreak = 0;
+            Debug.Log($"<color=orange>Streak Broken! Quests Completed: {questsCompleted}</color>");
+        }
+
+        // --- NEW POTENCY CALCULATION ---
+        
+        // 1. Core Spell Multipliers
         float spellMultiplier = 1.0f;
         switch(activeSpell)
         {
@@ -670,13 +699,14 @@ public class BattleManager : MonoBehaviour
             case SpellType.FrostSpikes: spellMultiplier = 1.3f; break;
             case SpellType.ThunderStrike: spellMultiplier = 2.0f; break;
             case SpellType.GaleBurst: spellMultiplier = 1.0f; break;
-            case SpellType.EarthThrow: spellMultiplier = 1.5f; break;
+            case SpellType.EarthThrow: spellMultiplier = 1.5f; break; // Stun removed, kept as cheap nuke
             case SpellType.ArcaneBolts: spellMultiplier = 0.75f; break;
             
             case SpellType.WindVeil: spellMultiplier = 0.75f; break;
             case SpellType.FlameBarrier: spellMultiplier = 0.5f; break;
             case SpellType.ManaShield: spellMultiplier = 1.5f; break;
             case SpellType.Restraint: spellMultiplier = 1.0f; break;
+            case SpellType.Focus: spellMultiplier = 1.0f; break;
             
             case SpellType.Revitalize: spellMultiplier = 0.5f; break;
             case SpellType.Cleanse: spellMultiplier = 0.25f; break;
@@ -685,51 +715,45 @@ public class BattleManager : MonoBehaviour
             case SpellType.SoothingWaters: spellMultiplier = 0.5f; break;
         }
 
-        // 2. GOAL 1: Flat Potency Bonus Based on Category & Word Length!
+        // 2. Goal 4: Word Length Flat Bonus (+2 per letter starting at 4)
         int len = playerWord.Length;
-        float flatBonus = 0f;
-        
-        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
-        bool isUtility = (activeSpell == SpellType.WindVeil || activeSpell == SpellType.FlameBarrier || activeSpell == SpellType.ManaShield || activeSpell == SpellType.Restraint || activeSpell == SpellType.Focus);
-        bool isHealing = (activeSpell == SpellType.Revitalize || activeSpell == SpellType.Cleanse || activeSpell == SpellType.PurifyingFlames || activeSpell == SpellType.WinterEmbrace || activeSpell == SpellType.SoothingWaters);
-
-        // e.g. 5 letter Offensive word = 5 * 2 = +10 Potency to the base stat!
-        if (isOffensive && len >= 3) flatBonus = len * 2f;
-        else if (isUtility && len >= 4) flatBonus = len * 3f;
-        else if (isHealing && len >= 5) flatBonus = len * 4f;
-
-        currentCastBasePotency = baseSpellPotency + flatBonus; // Save this for HandleResolution!
-
-        // 3. GOAL 2: Exact Length Constraint Multipliers
-        float constraintMultiplier = 1.0f;
-        switch(currentQuest.tier2Rule)
+        float lengthBonus = 0f;
+        if (len >= 4)
         {
-            case Tier2Type.ExactLength_4: constraintMultiplier = 1.30f; break; // +30%
-            case Tier2Type.ExactLength_5: constraintMultiplier = 1.35f; break; // +35%
-            case Tier2Type.ExactLength_6: constraintMultiplier = 1.40f; break; // +40%
-            case Tier2Type.ExactLength_7: constraintMultiplier = 1.45f; break; // +45%
-            case Tier2Type.ExactLength_8: constraintMultiplier = 1.50f; break; // +50%
-            case Tier2Type.ExactLength_9: constraintMultiplier = 1.60f; break; // +60%
+            lengthBonus = (len - 3) * 2f; // 4 letters = +2, 5 letters = +4, 6 letters = +6...
         }
 
-        float finalPotency = spellMultiplier * constraintMultiplier;
+        // 3. Goal 6: Quest Streak Flat Bonus
+        float streakBonus = 0f;
+        if (questStreak >= 20) streakBonus = 15f;
+        else if (questStreak >= 10) streakBonus = 9f;
+        else if (questStreak >= 5) streakBonus = 4f;
+        else if (questStreak >= 3) streakBonus = 3f;
 
-        // 4. Overtime Penalty
+        // Save the dynamic base for the Resolution state
+        currentCastBasePotency = baseSpellPotency + lengthBonus + streakBonus; 
+
+        // 4. Goal 3: Optional Quest Completion Multiplier
+        float questMultiplier = 1.0f;
+        if (questsCompleted == 1) questMultiplier = 1.30f;       // +30%
+        else if (questsCompleted == 2) questMultiplier = 1.70f;  // +70%
+
+        float finalPotency = spellMultiplier * questMultiplier;
+
+        // 5. Overtime Penalty
         if (isOvertime)
         {
-            Debug.Log("<color=orange>Overtime Cast! Suffered a time penalty!</color>");
             float timeUsed = maxOvertime - currentOvertime; 
             float overtimePercentage = timeUsed / maxOvertime; 
             float penalty = overtimePercentage * maxPenaltyPercent;
-            
             finalPotency *= (1.0f - penalty); 
         }
 
-        // 5. Consume Focus Buff
+        // 6. Focus Buff
+        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
         if (isOffensive && focusActive)
         {
             finalPotency *= (1.0f + focusDamageBonus);
-            Debug.Log($"<color=yellow>FOCUS CONSUMED! Damage increased by {focusDamageBonus * 100}%!</color>");
             focusActive = false; 
         }
 
@@ -780,53 +804,26 @@ public class BattleManager : MonoBehaviour
                     return;
                 }
 
-                if (!playerWord.StartsWith(currentQuest.targetLetter))
-                {
-                    Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
-                    wordInputField.textComponent.color = Color.red;
-                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
-                    {
-                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
-                        wordInputField.ForceLabelUpdate();
-                    }
-                    isSubmitLocked = false;
-                    return;
-                }
-
-                bool t2Passed = QuestValidator.CheckTier2(playerWord, currentQuest.tier2Rule);
-                if (t2Passed)
-                {
-                    Debug.Log("<color=cyan>First word accepted! Waiting for second word...</color>");
-                    
-                    // Reward them with time for getting the first word!
-                    currentTypingTimer += 15f; 
-                    if (currentTypingTimer > maxTypingTime) currentTypingTimer = maxTypingTime; // Cap it so it doesn't overflow
-                    Debug.Log("<color=green>+15 Seconds added to the clock!</color>");
-                    
-                    // Save the first word and change state
-                    firstDoubleCastWord = playerWord;
-                    isWaitingForSecondWord = true;
-                    
-                    // UI UX Updates: Clear the box and update the side panel text
-                    wordInputField.text = ""; 
-                    wordInputField.textComponent.color = Color.black; 
-                    tier3StatusText.text = "ULTIMATE: Double Cast (1/2 Done!)";
-                    
-                    // Refocus the input field so they don't have to click it again
-                    wordInputField.ActivateInputField(); 
-                    isSubmitLocked = false; // Unlock so they can submit the second word!
-                }
-                else
-                {
-                    Debug.Log("<color=orange>Word failed the Shape/Rule requirement.</color>");
-                    wordInputField.textComponent.color = Color.red;
-                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
-                    {
-                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
-                        wordInputField.ForceLabelUpdate();
-                    }
-                    isSubmitLocked = false;
-                }
+                // SUCCESS! First word accepted. (Tiers are now optional!)
+                Debug.Log("<color=cyan>First word accepted! Waiting for second word...</color>");
+                
+                // Reward them with time for getting the first word!
+                currentTypingTimer += 15f; 
+                if (currentTypingTimer > maxTypingTime) currentTypingTimer = maxTypingTime; // Cap it so it doesn't overflow
+                Debug.Log("<color=green>+15 Seconds added to the clock!</color>");
+                
+                // Save the first word and change state
+                firstDoubleCastWord = playerWord;
+                isWaitingForSecondWord = true;
+                
+                // UI UX Updates: Clear the box and update the side panel text
+                wordInputField.text = ""; 
+                wordInputField.textComponent.color = Color.black; 
+                tier3StatusText.text = "ULTIMATE: Double Cast (1/2 Done!)";
+                
+                // Refocus the input field so they don't have to click it again
+                wordInputField.ActivateInputField(); 
+                isSubmitLocked = false; // Unlock so they can submit the second word!
                 
                 return; // Stop here! Do not end the turn! Let the timer keep ticking!
             }
@@ -858,47 +855,21 @@ public class BattleManager : MonoBehaviour
                     return;
                 }
 
-                if (!playerWord.StartsWith(currentQuest.targetLetter.ToString()))
-                {
-                    Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
-                    wordInputField.textComponent.color = Color.red;
-                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
-                    {
-                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
-                        wordInputField.ForceLabelUpdate();
-                    }
-                    isSubmitLocked = false;
-                    return;
-                }
+                // SUCCESS! Second word accepted. (Tiers are now optional!)
+                // NEW: Apply the 200% Damage Multiplier for successfully Double Casting!
+                currentSpellPotency *= 2.0f; 
 
-                bool t2Passed = QuestValidator.CheckTier2(playerWord, currentQuest.tier2Rule);
-                if (t2Passed)
-                {
-                    // NEW: Apply the 200% Damage Multiplier for successfully Double Casting!
-                    currentSpellPotency *= 2.0f; 
-
-                    Debug.Log($"<color=cyan>DOUBLE CAST SUCCESS! Ultimate Spell Activated at {(currentSpellPotency * 100).ToString("F1")}% Power!</color>");
-                    
-                    // Save ONLY the second word for the next turn's spam filter
-                    RecordSuccessfulWord(playerWord, currentQuest.targetLetter); 
-                    
-                    // Reset variables for safety
-                    isWaitingForSecondWord = false;
-                    firstDoubleCastWord = "";
-                    
-                    ChangeState(BattleState.Resolution);
-                }
-                else
-                {
-                    Debug.Log("<color=orange>Second word failed the Shape/Rule requirement.</color>");
-                    wordInputField.textComponent.color = Color.red;
-                    if (wordInputField.contentType == TMP_InputField.ContentType.Password)
-                    {
-                        wordInputField.contentType = TMP_InputField.ContentType.Standard;
-                        wordInputField.ForceLabelUpdate();
-                    }
-                    isSubmitLocked = false;
-                }
+                Debug.Log($"<color=cyan>DOUBLE CAST SUCCESS! Ultimate Spell Activated at {(currentSpellPotency * 100).ToString("F1")}% Power!</color>");
+                
+                // Save ONLY the second word for the next turn's spam filter
+                RecordSuccessfulWord(playerWord, currentQuest.targetLetter); 
+                
+                // Reset variables for safety
+                isWaitingForSecondWord = false;
+                firstDoubleCastWord = "";
+                
+                isLesserSpell = false; // Normal spell achieved!
+                ChangeState(BattleState.Resolution);
                 
                 return; // Stop here so it doesn't run the normal single-word code
             }
@@ -931,36 +902,7 @@ public class BattleManager : MonoBehaviour
             return; 
         }
 
-        // 1. Mandatory Tier 1 Check
-        if (!playerWord.StartsWith(currentQuest.targetLetter))
-        {
-            Debug.Log($"<color=red>Failed! Word must start with {currentQuest.targetLetter}</color>");
-            wordInputField.textComponent.color = Color.red; 
-            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
-            {
-                wordInputField.contentType = TMP_InputField.ContentType.Standard;
-                wordInputField.ForceLabelUpdate();
-            }
-            isSubmitLocked = false;
-            return; // STOP! Let them keep typing.
-        }
-
-        // 2. Mandatory Tier 2 Check
-        bool tier2Passed = QuestValidator.CheckTier2(playerWord, currentQuest.tier2Rule);
-        if (!tier2Passed)
-        {
-            Debug.Log("<color=orange>Tier 2 Rule Failed. You must fulfill the side quest!</color>");
-            wordInputField.textComponent.color = Color.red;
-            if (wordInputField.contentType == TMP_InputField.ContentType.Password)
-            {
-                wordInputField.contentType = TMP_InputField.ContentType.Standard;
-                wordInputField.ForceLabelUpdate();
-            }
-            isSubmitLocked = false;
-            return; // STOP! Let them keep typing.
-        }
-
-        // 3. SUCCESS! Both tiers passed.
+        // 3. SUCCESS! Spell Cast. (Tiers are now optional!)
         Debug.Log($"<color=green>Spell Activated at {(finalPotency * 100).ToString("F1")}% Power.</color>");
         RecordSuccessfulWord(playerWord, currentQuest.targetLetter);
         
