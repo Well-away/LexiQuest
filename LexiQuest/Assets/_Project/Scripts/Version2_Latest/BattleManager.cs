@@ -40,6 +40,14 @@ public class BattleManager : MonoBehaviour
     public TextMeshProUGUI scoreText;
     private int enemiesDefeatedCount = 0;
 
+    [Header("Scribe's Review")]
+    public List<string> scribesReviewWords = new List<string>(); // Tracks all words!
+    public TextMeshProUGUI scribesReviewText; // Drag a UI Text here to show the list on Game Over!
+
+    [Header("Enemy AI Cooldowns")]
+    public int enemyHeavyAttackCD = 0;
+    public int enemyHealCD = 0;
+
     [Header("Phase 1 & 2 Spell UI")]
     public GameObject categorySelectPanel;
     public GameObject spellSelectPanel;
@@ -137,9 +145,10 @@ public class BattleManager : MonoBehaviour
     public int playerBleedTurns = 0;
     public float playerBleedAmount = 0f;
     public int playerDebuffCount = 0;        
-    public float playerDamageReduction = 0f; // Gale Burst / Wind Veil flat block!
+    public int playerDebuffImmunityTurns = 0; // For the new Purify!
+    public float playerDamageReductionPercent = 0f; // For the new Lesser Shield!
     public int playerDamageReductionTurns = 0;
-    public float flameBarrierBurnAmount = 0f; // Retaliation burn
+    public float flameBarrierBurnAmount = 0f; 
     public int flameBarrierTurns = 0;
     public TextMeshProUGUI playerStatusText; // NEW: Drag a Text component here for the UI!
 
@@ -294,7 +303,12 @@ public class BattleManager : MonoBehaviour
                 break;
             case BattleState.GameOver:
                 if (gameOverPanel != null) gameOverPanel.SetActive(true);
-                if (scoreText != null) scoreText.text = "Enemies Defeated: " + enemiesDefeatedCount;
+                
+                string finalScore = "Enemies Defeated: " + enemiesDefeatedCount + "\n\n";
+                finalScore += "<b>SCRIBE'S REVIEW (Words Typed):</b>\n";
+                finalScore += string.Join(", ", scribesReviewWords); // Lists all words separated by a comma!
+                
+                if (scoreText != null) scoreText.text = finalScore;
                 break;
         }
     }
@@ -313,6 +327,17 @@ public class BattleManager : MonoBehaviour
         enemiesDefeatedCount = 0;
         enemyTurnSkipCount = 0;
         enemyDamageMultiplier = 1.0f;
+        
+        scribesReviewWords.Clear();
+        enemyHeavyAttackCD = 0;
+        enemyHealCD = 0;
+        
+        questStreak = 0;
+        if (streakText != null)
+        {
+            streakText.text = "";
+            streakText.gameObject.SetActive(false);
+        }
         
         UpdateHealthUI();
         
@@ -339,11 +364,11 @@ public class BattleManager : MonoBehaviour
         List<SpellType> pool = new List<SpellType>();
 
         if (category == SpellCategory.Offensive)
-            pool = new List<SpellType> { SpellType.ArcaneBolts, SpellType.GaleBurst, SpellType.FlameBlast, SpellType.FrostSpikes, SpellType.EarthThrow, SpellType.ThunderStrike };
+            pool = new List<SpellType> { SpellType.MagicMissiles, SpellType.WindBlast, SpellType.FireBlast, SpellType.FrostSpikes, SpellType.EarthThrow, SpellType.ThunderStrike };
         else if (category == SpellCategory.Utility)
-            pool = new List<SpellType> { SpellType.FlameBarrier, SpellType.WindVeil, SpellType.ManaShield, SpellType.Restraint, SpellType.Focus };
+            pool = new List<SpellType> { SpellType.LesserShield, SpellType.FlameBarrier, SpellType.ManaShield, SpellType.Focus };
         else if (category == SpellCategory.Healing)
-            pool = new List<SpellType> { SpellType.SoothingWaters, SpellType.Cleanse, SpellType.PurifyingFlames, SpellType.Revitalize, SpellType.WinterEmbrace };
+            pool = new List<SpellType> { SpellType.LesserHeal, SpellType.Purify, SpellType.GreaterHeal };
 
         // Loop through all 6 UI buttons
         for (int i = 0; i < 6; i++)
@@ -477,6 +502,21 @@ public class BattleManager : MonoBehaviour
         tier1StatusText.text = "Letter: " + currentQuest.targetLetter;
         tier2StatusText.text = "Rule: " + currentQuest.tier2Description;
         
+        // Show Quest Streak if applicable
+        if (streakText != null)
+        {
+            if (questStreak >= 3)
+            {
+                streakText.gameObject.SetActive(true);
+                streakText.text = $"Streak: {questStreak} 🔥";
+            }
+            else
+            {
+                streakText.text = "";
+                streakText.gameObject.SetActive(false);
+            }
+        }
+
         // Only show Tier 3 UI if it's an Ultimate Boss Turn
         if (currentQuest.tier3Rule != Tier3Type.None)
         {
@@ -719,8 +759,16 @@ public class BattleManager : MonoBehaviour
 
         if (streakText != null)
         {
-            if (questStreak > 0) streakText.text = $"Quest Streak: {questStreak}";
-            else streakText.text = ""; // Hide it if they break the streak!
+            if (questStreak >= 3) 
+            {
+                streakText.gameObject.SetActive(true);
+                streakText.text = $"Streak: {questStreak} 🔥";
+            }
+            else 
+            {
+                streakText.text = "";
+                streakText.gameObject.SetActive(false); // Fully hide it from the UI layout!
+            }
         }
 
         // --- NEW POTENCY CALCULATION ---
@@ -729,24 +777,21 @@ public class BattleManager : MonoBehaviour
         float spellMultiplier = 1.0f;
         switch(activeSpell)
         {
-            case SpellType.FlameBlast: spellMultiplier = 1.2f; break;
+            case SpellType.MagicMissiles: spellMultiplier = 0.75f; break;
+            case SpellType.WindBlast: spellMultiplier = 1.0f; break;
+            case SpellType.FireBlast: spellMultiplier = 1.2f; break;
             case SpellType.FrostSpikes: spellMultiplier = 1.3f; break;
+            case SpellType.EarthThrow: spellMultiplier = 1.5f; break; 
             case SpellType.ThunderStrike: spellMultiplier = 2.0f; break;
-            case SpellType.GaleBurst: spellMultiplier = 1.0f; break;
-            case SpellType.EarthThrow: spellMultiplier = 1.5f; break; // Stun removed, kept as cheap nuke
-            case SpellType.ArcaneBolts: spellMultiplier = 0.75f; break;
             
-            case SpellType.WindVeil: spellMultiplier = 0.75f; break;
+            case SpellType.LesserShield: spellMultiplier = 0.75f; break;
             case SpellType.FlameBarrier: spellMultiplier = 0.5f; break;
             case SpellType.ManaShield: spellMultiplier = 1.5f; break;
-            case SpellType.Restraint: spellMultiplier = 1.0f; break;
             case SpellType.Focus: spellMultiplier = 1.0f; break;
             
-            case SpellType.Revitalize: spellMultiplier = 0.5f; break;
-            case SpellType.Cleanse: spellMultiplier = 0.25f; break;
-            case SpellType.PurifyingFlames: spellMultiplier = 1.0f; break; 
-            case SpellType.WinterEmbrace: spellMultiplier = 0.8f; break;
-            case SpellType.SoothingWaters: spellMultiplier = 0.5f; break;
+            case SpellType.LesserHeal: spellMultiplier = 0.5f; break;
+            case SpellType.Purify: spellMultiplier = 0.25f; break;
+            case SpellType.GreaterHeal: spellMultiplier = 1.0f; break;
         }
 
         // 2. Goal 4: Word Length Flat Bonus (+2 per letter starting at 4)
@@ -784,7 +829,7 @@ public class BattleManager : MonoBehaviour
         }
 
         // 6. Focus Buff
-        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
+        bool isOffensive = (activeSpell == SpellType.FireBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.WindBlast || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.MagicMissiles);
         if (isOffensive && focusActive)
         {
             finalPotency *= (1.0f + focusDamageBonus);
@@ -900,6 +945,9 @@ public class BattleManager : MonoBehaviour
                 // Save ONLY the second word for the next turn's spam filter
                 RecordSuccessfulWord(playerWord, currentQuest.targetLetter); 
                 
+                // ADD TO SCRIBE'S REVIEW
+                if (!scribesReviewWords.Contains(playerWord)) scribesReviewWords.Add(playerWord);
+                
                 // Reset variables for safety
                 isWaitingForSecondWord = false;
                 firstDoubleCastWord = "";
@@ -942,6 +990,9 @@ public class BattleManager : MonoBehaviour
         Debug.Log($"<color=green>Spell Activated at {(finalPotency * 100).ToString("F1")}% Power.</color>");
         RecordSuccessfulWord(playerWord, currentQuest.targetLetter);
         
+        // ADD TO SCRIBE'S REVIEW
+        if (!scribesReviewWords.Contains(playerWord)) scribesReviewWords.Add(playerWord);
+        
         isLesserSpell = false; // Normal spell achieved!
         ChangeState(BattleState.Resolution);
     }
@@ -952,97 +1003,91 @@ public class BattleManager : MonoBehaviour
         spellCooldowns[activeSpell] = GetMaxCooldown(activeSpell);
 
         // 2. Is it an Offensive Spell?
-        bool isOffensive = (activeSpell == SpellType.FlameBlast || activeSpell == SpellType.FrostSpikes || 
-                            activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.GaleBurst || 
-                            activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneBolts);
+        bool isOffensive = (activeSpell == SpellType.FireBlast || activeSpell == SpellType.FrostSpikes || 
+                            activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.WindBlast || 
+                            activeSpell == SpellType.EarthThrow || activeSpell == SpellType.MagicMissiles);
+
+        introBanner.SetActive(true); // TURN ON THE BANNER FOR COMBAT TEXT!
 
         if (isOffensive)
         {
-            // --- OFFENSIVE SPELL EFFECTS ---
             float damageDealt = currentCastBasePotency * currentSpellPotency;
             
-            // Arcane Bolts: 15% Chance to Crit!
-            if (activeSpell == SpellType.ArcaneBolts)
+            if (activeSpell == SpellType.MagicMissiles && Random.value <= 0.15f)
             {
-                if (Random.value <= 0.15f)
-                {
-                    damageDealt *= 1.2f;
-                    Debug.Log("<color=yellow>CRITICAL STRIKE! Arcane Bolts deals 1.2x damage!</color>");
-                }
+                damageDealt *= 1.2f;
+                Debug.Log("CRIT!");
             }
 
             if (isLesserSpell) damageDealt *= 0.5f; 
-
-            // Apply Frostbite Vulnerability!
             damageDealt *= enemyVulnerability; 
-            enemyVulnerability = 1.0f; // NEW: Consume the Frostbite so it resets AFTER Amy hits!
+            enemyVulnerability = 1.0f; // Consume the Frostbite so it resets AFTER Amy hits!
 
-            enemyCurrentHP -= damageDealt;
+            // Convert to an integer so the UI looks clean!
+            int displayDamage = Mathf.RoundToInt(damageDealt);
+            enemyCurrentHP -= displayDamage;
             if (enemyCurrentHP < 0) enemyCurrentHP = 0;
             
+            bannerText.text = $"AMY DEALT {displayDamage} DAMAGE!";
+            bannerText.color = Color.red;
+
             // Apply Status Effects
-            if (activeSpell == SpellType.FlameBlast)
+            if (activeSpell == SpellType.FireBlast)
             {
                 enemyBurnAmount = currentCastBasePotency * currentSpellPotency * 0.15f;
                 enemyBurnTurns = 3;
-                Debug.Log($"<color=red>Flame Blast applied Burn! Enemy will take {enemyBurnAmount} damage for 3 turns.</color>");
             }
-            else if (activeSpell == SpellType.FrostSpikes)
+            else if (activeSpell == SpellType.FrostSpikes) enemyVulnerability = 1.2f; 
+            else if (activeSpell == SpellType.ThunderStrike) enemyDamageMultiplier = 0.8f; 
+            else if (activeSpell == SpellType.WindBlast)
             {
-                enemyVulnerability = 1.2f; // 20% increased damage taken
-                Debug.Log("<color=cyan>Frost Spikes applied Frostbite! Enemy takes 20% more damage.</color>");
-            }
-            else if (activeSpell == SpellType.ThunderStrike)
-            {
-                enemyDamageMultiplier = 0.8f; // 20% less damage dealt
-                Debug.Log("<color=yellow>Thunder Strike applied Electrified! Enemy deals 20% less damage.</color>");
-            }
-            else if (activeSpell == SpellType.GaleBurst)
-            {
-                playerDamageReduction = currentCastBasePotency * currentSpellPotency * 0.25f;
+                playerDamageReductionPercent = 0.20f; // Wind blast 20%
                 playerDamageReductionTurns = 1;
-                Debug.Log($"<color=white>Gale Burst! Next incoming damage reduced by {playerDamageReduction} flat potency.</color>");
             }
 
             UpdateHealthUI();
-            Debug.Log($"<color=cyan>Offensive Spell: {activeSpell} | Power: {currentSpellPotency}x | Damage: {damageDealt} | Serpent HP: {enemyCurrentHP}</color>");
         }
         else
         {
-            // UTILITY & HEALING MATH: Do not deal damage!
-            Debug.Log($"<color=cyan>Cast Non-Offensive Spell: {activeSpell} at {currentSpellPotency}x Potency!</color>");
+            // UTILITY & HEALING
+            int displayHeal = 0;
             
-            // --- THESIS MECHANIC: UTILITY EFFECTS ---
-            if (activeSpell == SpellType.WindVeil)
+            if (activeSpell == SpellType.LesserShield)
             {
-                playerDamageReduction = currentCastBasePotency * currentSpellPotency * 0.40f;
+                playerDamageReductionPercent = 0.25f; // 25% Reduction
                 playerDamageReductionTurns = 2;
-                Debug.Log($"<color=white>Wind Veil! Incoming damage reduced by {playerDamageReduction} flat potency for 2 turns.</color>");
+                bannerText.text = "LESSER SHIELD ACTIVATED!";
             }
             else if (activeSpell == SpellType.FlameBarrier)
             {
                 flameBarrierBurnAmount = currentCastBasePotency * currentSpellPotency * 0.25f;
                 flameBarrierTurns = 2;
-                Debug.Log($"<color=red>Flame Barrier! Attackers will be burned for {flameBarrierBurnAmount} damage for 2 turns.</color>");
             }
-            else if (activeSpell == SpellType.ManaShield) // Kept Mana Shield as a standard shield
+            else if (activeSpell == SpellType.ManaShield) 
             {
                 float shieldAmount = currentCastBasePotency * currentSpellPotency;
                 playerCurrentShield += shieldAmount; 
-                Debug.Log($"<color=cyan>Mana Shield Applied! Amy gains {shieldAmount} Shield.</color>");
+                bannerText.text = $"GAINED {Mathf.RoundToInt(shieldAmount)} SHIELD!";
             }
-
-            // --- THESIS MECHANIC: RESTRAINT ---
-            if (activeSpell == SpellType.Restraint)
+            else if (activeSpell == SpellType.LesserHeal)
             {
-                Debug.Log("<color=yellow>Restraint applied! Serpent skips a turn and is weakened by 40%.</color>");
-                enemyTurnSkipCount = 1; 
-                enemyDamageMultiplier = 0.6f; 
+                displayHeal = Mathf.RoundToInt(currentCastBasePotency * currentSpellPotency * 0.5f);
+                bannerText.text = $"HEALED FOR {displayHeal} HP!";
             }
-
-            // --- THESIS MECHANIC: FOCUS ---
-            if (activeSpell == SpellType.Focus)
+            else if (activeSpell == SpellType.GreaterHeal)
             {
+                displayHeal = Mathf.RoundToInt(currentCastBasePotency * currentSpellPotency * 1.0f);
+                bannerText.text = $"HEALED FOR {displayHeal} HP!";
+            }
+            else if (activeSpell == SpellType.Purify)
+            {
+                playerDebuffImmunityTurns = 2; // Immune this turn and next!
+                // (Clear any existing debuffs here if enemies apply them later)
+                bannerText.text = "PURIFIED! DEBUFF IMMUNITY SECURED.";
+            }
+            else if (activeSpell == SpellType.Focus)
+            {
+                // Keep your existing Focus logic here!
                 float bonus = 0.50f; // Base 50% for 4 letters
                 if (lastWordLength == 5) bonus = 0.55f;
                 else if (lastWordLength == 6) bonus = 0.60f;
@@ -1060,69 +1105,29 @@ public class BattleManager : MonoBehaviour
                 }
 
                 Debug.Log($"<color=yellow>FOCUS CAST! All CDs set to 1. Next attack gains +{bonus * 100}% Potency!</color>");
-            }
-
-            // --- THESIS MECHANIC: HEALING SPELLS ---
-            float immediateHeal = 0f;
-
-            if (activeSpell == SpellType.Revitalize)
-            {
-                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.5f;
-                playerHoTTurns = 3;
-                incomingHealBonusTurns = 2; 
-                Debug.Log($"<color=green>Revitalize! Regen {playerHoTAmount} HP for 3 turns. Incoming healing +50% for 2 turns.</color>");
-            }
-            else if (activeSpell == SpellType.Cleanse)
-            {
-                // Dispel all debuffs and heal 0.25x per debuff
-                // NOTE: We assume 1 debuff here just so it actually heals during prototype testing!
-                int dispelled = (playerDebuffCount > 0) ? playerDebuffCount : 1; 
-                immediateHeal = currentCastBasePotency * currentSpellPotency * 0.25f * dispelled;
-                playerDebuffCount = 0;
-                Debug.Log($"<color=green>Cleanse! Dispelled {dispelled} debuffs and healed {immediateHeal} HP.</color>");
-            }
-            else if (activeSpell == SpellType.PurifyingFlames)
-            {
-                float selfDamage = currentCastBasePotency * currentSpellPotency * 0.75f;
-                playerCurrentHP -= selfDamage;
-                if (playerCurrentHP < 0) playerCurrentHP = 0;
                 
-                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 1.0f;
-                playerHoTTurns = 2;
-                Debug.Log($"<color=green>Purifying Flames! Took {selfDamage} damage. Will heal {playerHoTAmount} HP for 2 turns.</color>");
-            }
-            else if (activeSpell == SpellType.WinterEmbrace)
-            {
-                isDamageImmune = true; // Protects Amy from the Boss's attack this turn!
-                immediateHeal = currentCastBasePotency * currentSpellPotency * 0.8f;
-                
-                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.8f;
-                playerHoTTurns = 1; // Heals again next turn
-                Debug.Log($"<color=green>Winter Embrace! Damage Immunity Active. Healed {immediateHeal} HP. Will heal again next turn.</color>");
-            }
-            else if (activeSpell == SpellType.SoothingWaters)
-            {
-                immediateHeal = currentCastBasePotency * currentSpellPotency * 0.5f;
-                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.15f;
-                playerHoTTurns = 2;
-                Debug.Log($"<color=green>Soothing Waters! Healed {immediateHeal} HP. Regen {playerHoTAmount} HP for 2 turns.</color>");
+                bannerText.text = "FOCUS! COOLDOWNS RESET.";
             }
 
-            // APPLY THE IMMEDIATE HEAL TO AMY'S HEALTH BAR
-            if (immediateHeal > 0)
+            // Apply the instant heals
+            if (displayHeal > 0)
             {
-                if (incomingHealBonusTurns > 0) immediateHeal *= 1.5f; // Apply Revitalize Bonus if active
-                
-                playerCurrentHP += immediateHeal;
-                if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP; // Prevent overhealing max HP
-                Debug.Log($"<color=green>Amy recovered HP! Current HP: {playerCurrentHP}</color>");
+                playerCurrentHP += displayHeal;
+                if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP;
+                bannerText.color = Color.green;
+            }
+            else
+            {
+                bannerText.color = Color.cyan;
             }
 
-            UpdateHealthUI(); // Update the visual bars instantly!
+            UpdateHealthUI(); 
         }
 
-        // 3. Pause so the player can watch the 3D scene
+        // 3. Pause so the player can read the banner and watch the scene
         yield return new WaitForSeconds(3.5f); 
+        introBanner.SetActive(false); // Hide the banner before moving on
+        bannerText.color = Color.black; // Reset text color
 
         // Check for Boss Death
         if (enemyCurrentHP <= 0)
@@ -1167,37 +1172,42 @@ public class BattleManager : MonoBehaviour
             yield break;
         }
 
-        // 2. WIND SERPENT AI (Light Attack, Heavy Attack, Heal)
-        int aiChoice = Random.Range(0, 100);
+        // TICK COOLDOWNS
+        if (enemyHeavyAttackCD > 0) enemyHeavyAttackCD--;
+        if (enemyHealCD > 0) enemyHealCD--;
+
+        introBanner.SetActive(true); // Turn on the banner for the Boss attack!
+
         float finalEnemyDamage = 0f;
         
-        if (aiChoice < 20) // 20% Chance: Defensive Heal
+        // 2. WIND SERPENT AI (Cooldown Based!)
+        if (enemyHealCD == 0 && enemyCurrentHP < enemyMaxHP * 0.5f) // Will only heal if below 50% HP!
         {
-            float healAmount = enemyMaxHP * 0.1f; // Heals 10% of Max HP
+            float healAmount = enemyMaxHP * 0.1f; 
             enemyCurrentHP += healAmount;
             if (enemyCurrentHP > enemyMaxHP) enemyCurrentHP = enemyMaxHP;
-            Debug.Log($"<color=green>Wind Serpent uses Mending Winds! Heals for {healAmount} HP.</color>");
-        }
-        else if (aiChoice < 50) // 30% Chance: Heavy Attack
-        {
-            Debug.Log("<color=red>Wind Serpent uses Raging Tempest! (Heavy Attack)</color>");
-            finalEnemyDamage = (enemyBaseDamage * 1.5f) * enemyDamageMultiplier;
-        }
-        else // 50% Chance: Venomous Bite
-        {
-            Debug.Log("<color=red>Wind Serpent uses Venomous Bite!</color>");
-            finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
             
-            // Apply a Debuff to Amy!
-            playerBleedTurns = 2;
-            playerBleedAmount = 10f;
-            playerDebuffCount = 1; // Now Cleanse will actually detect a debuff!
-            Debug.Log("<color=purple>Amy is Poisoned! She will take 10 damage for 2 turns.</color>");
+            enemyHealCD = 5; // Base 3 + 2 increase
+            bannerText.text = "BOSS USED MENDING Winds!";
+            bannerText.color = Color.green;
+        }
+        else if (enemyHeavyAttackCD == 0) 
+        {
+            finalEnemyDamage = (enemyBaseDamage * 1.5f) * enemyDamageMultiplier;
+            enemyHeavyAttackCD = 4; // Base 2 + 2 increase
+            bannerText.text = "BOSS USED RAGING TEMPEST!";
+            bannerText.color = Color.red;
+        }
+        else 
+        {
+            finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
+            bannerText.text = "BOSS USED SONIC TAIL.";
+            bannerText.color = Color.red;
         }
 
-        // Reset weakness/vuln at the end of its turn (unless it's permanent until cleansed)
+        // Reset weakness/vuln at the end of its turn
         enemyDamageMultiplier = 1.0f; 
-        enemyVulnerability = 1.0f; // Frostbite wears off after it takes its turn
+        enemyVulnerability = 1.0f; 
 
         // 3. APPLY DAMAGE TO AMY
         if (finalEnemyDamage > 0)
@@ -1209,13 +1219,11 @@ public class BattleManager : MonoBehaviour
                 finalEnemyDamage = 0;
             }
 
-            // B. Apply Flat Damage Reduction (Gale Burst / Wind Veil)
+            // NEW: Apply % Damage Reduction (Lesser Shield / Wind Blast)
             if (playerDamageReductionTurns > 0)
             {
-                finalEnemyDamage -= playerDamageReduction;
-                if (finalEnemyDamage < 0) finalEnemyDamage = 0;
+                finalEnemyDamage *= (1.0f - playerDamageReductionPercent);
                 playerDamageReductionTurns--;
-                Debug.Log($"<color=white>Damage reduced by {playerDamageReduction}! Final incoming damage: {finalEnemyDamage}</color>");
             }
 
             // C. Shield & HP Math
@@ -1255,6 +1263,7 @@ public class BattleManager : MonoBehaviour
 
         UpdateHealthUI();
         yield return new WaitForSeconds(3.0f);
+        introBanner.SetActive(false);
 
         if (playerCurrentHP <= 0)
         {
@@ -1463,24 +1472,22 @@ public class BattleManager : MonoBehaviour
     private int GetMaxCooldown(SpellType spell)
     {
         switch(spell) {
-            case SpellType.ArcaneBolts: return 0;
-            case SpellType.GaleBurst: return 2;      // Up from 1
-            case SpellType.FlameBlast: return 3;     // Up from 2
-            case SpellType.EarthThrow: return 4;     // Thunder Strike Lite
-            case SpellType.FrostSpikes: return 4;    // Up from 2 (Frostbite is strong!)
-            case SpellType.ThunderStrike: return 6;  // Up from 5
+            case SpellType.MagicMissiles: return 0; // No change
+            case SpellType.LesserShield: return 0;  // No change
+            case SpellType.LesserHeal: return 4;    // Kept at original Soothing Waters CD (4)
             
-            case SpellType.FlameBarrier: return 3;   // Up from 2
-            case SpellType.WindVeil: return 4;       // Up from 3
-            case SpellType.ManaShield: return 5;     // Up from 4
-            case SpellType.Focus: return 8;          // Up from 7
-            case SpellType.Restraint: return 7;      // Up from 6
+            case SpellType.WindBlast: return 4;     // Was 2 -> 4
+            case SpellType.FireBlast: return 5;     // Was 3 -> 5
+            case SpellType.EarthThrow: return 6;    // Was 4 -> 6
+            case SpellType.FrostSpikes: return 6;   // Was 4 -> 6
+            case SpellType.ThunderStrike: return 8; // Was 6 -> 8
             
-            case SpellType.SoothingWaters: return 4; // Up from 3
-            case SpellType.Cleanse: return 4;        // Up from 3
-            case SpellType.PurifyingFlames: return 5;// Up from 4
-            case SpellType.Revitalize: return 6;     // Up from 5
-            case SpellType.WinterEmbrace: return 7;  // Up from 6
+            case SpellType.FlameBarrier: return 5;  // Was 3 -> 5
+            case SpellType.ManaShield: return 7;    // Was 5 -> 7
+            case SpellType.Focus: return 10;        // Was 8 -> 10
+            
+            case SpellType.Purify: return 6;        // Was 4 -> 6
+            case SpellType.GreaterHeal: return 8;   // Was 6 -> 8
             default: return 0;
         }
     }

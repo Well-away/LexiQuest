@@ -18,16 +18,16 @@ public enum Tier3Type { None, FlawlessCasting, SpeedCasting, DoubleCast, BlindCa
 
 public enum SpellCategory { Offensive, Utility, Healing }
 
-// NEW: All 15 Spells added to the Enum!
+// THE FINAL SPELL LIST
 public enum SpellType 
 { 
     None, 
     // Offensive
-    FlameBlast, FrostSpikes, ThunderStrike, GaleBurst, EarthThrow, ArcaneBolts,
+    MagicMissiles, WindBlast, FireBlast, FrostSpikes, EarthThrow, ThunderStrike, 
     // Utility
-    WindVeil, FlameBarrier, ManaShield, Restraint, Focus,
+    LesserShield, FlameBarrier, ManaShield, Focus,
     // Healing
-    Revitalize, Cleanse, PurifyingFlames, WinterEmbrace, SoothingWaters
+    LesserHeal, Purify, GreaterHeal
 }
 
 public class QuestData
@@ -86,26 +86,23 @@ public class QuestManager : MonoBehaviour
         switch (chosenSpell)
         {
             // OFFENSIVE
-            case SpellType.FlameBlast: spellRules = new[] { Tier2Type.ExactLength_5, Tier2Type.ExactLength_6, Tier2Type.ExactLength_7, Tier2Type.ExactLength_8 }; break;
+            case SpellType.MagicMissiles: spellRules = new[] { Tier2Type.None }; break;
+            case SpellType.WindBlast: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER }; break;
+            case SpellType.FireBlast: spellRules = new[] { Tier2Type.ExactLength_5, Tier2Type.ExactLength_6, Tier2Type.ExactLength_7, Tier2Type.ExactLength_8 }; break;
             case SpellType.FrostSpikes: spellRules = new[] { Tier2Type.No_Letter_T, Tier2Type.No_Letter_R, Tier2Type.No_Letter_S, Tier2Type.No_Letter_U }; break;
-            case SpellType.ThunderStrike: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
-            case SpellType.GaleBurst: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER }; break;
             case SpellType.EarthThrow: spellRules = new[] { Tier2Type.No_Letter_U, Tier2Type.No_Letter_O, Tier2Type.No_Letter_C, Tier2Type.No_Letter_P }; break;
-            case SpellType.ArcaneBolts: spellRules = new[] { Tier2Type.None }; break;
+            case SpellType.ThunderStrike: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
             
             // UTILITY
-            case SpellType.WindVeil: spellRules = new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_O, Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_N }; break;
+            case SpellType.LesserShield: spellRules = new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_O, Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_N }; break;
             case SpellType.FlameBarrier: spellRules = new[] { Tier2Type.EndsWith_Y, Tier2Type.EndsWith_E, Tier2Type.EndsWith_LY, Tier2Type.EndsWith_N }; break;
             case SpellType.ManaShield: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
-            case SpellType.Restraint: spellRules = new[] { Tier2Type.No_Letter_O, Tier2Type.No_Letter_U, Tier2Type.No_Letter_R, Tier2Type.No_Letter_S, Tier2Type.No_Letter_T, Tier2Type.No_Letter_L }; break;
             case SpellType.Focus: spellRules = new[] { Tier2Type.MinLength_6, Tier2Type.EndsWith_ING, Tier2Type.No_Letter_A }; break;
 
             // HEALING
-            case SpellType.Revitalize: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ING }; break;
-            case SpellType.Cleanse: spellRules = new[] { Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.ExactLength_6 }; break;
-            case SpellType.PurifyingFlames: spellRules = new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_R, Tier2Type.No_Letter_N, Tier2Type.No_Letter_T }; break;
-            case SpellType.WinterEmbrace: spellRules = new[] { Tier2Type.EndsWith_Y, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER }; break;
-            case SpellType.SoothingWaters: spellRules = new[] { Tier2Type.MinLength_5 }; break; // WAITING FOR YOUR CONSTRAINT!
+            case SpellType.LesserHeal: spellRules = new[] { Tier2Type.MinLength_5 }; break; 
+            case SpellType.Purify: spellRules = new[] { Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.ExactLength_6 }; break;
+            case SpellType.GreaterHeal: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ING }; break;
 
             default: spellRules = new[] { Tier2Type.MinLength_5 }; break;
         }
