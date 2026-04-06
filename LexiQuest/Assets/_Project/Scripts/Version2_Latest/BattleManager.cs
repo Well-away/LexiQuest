@@ -524,7 +524,7 @@ public class BattleManager : MonoBehaviour
             if (questStreak >= 3)
             {
                 streakText.gameObject.SetActive(true);
-                streakText.text = $"Streak: {questStreak} 🔥";
+                streakText.text = $"Quest Streak: {questStreak}";
             }
             else
             {
@@ -1044,8 +1044,13 @@ public class BattleManager : MonoBehaviour
             enemyCurrentHP -= displayDamage;
             if (enemyCurrentHP < 0) enemyCurrentHP = 0;
             
-            bannerText.text = $"AMY DEALT {displayDamage} DAMAGE!";
+            // Format the spell name nicely for the banner!
+            string formattedSpellName = string.Concat(activeSpell.ToString().Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+            bannerText.text = $"{formattedSpellName.ToUpper()}!";
             bannerText.color = Color.red;
+            
+            // Trigger Floating Text above the Enemy!
+            ShowFloatingText($"-{displayDamage}", enemyFloatingTextSpawn, Color.red);
 
             // Apply Status Effects
             if (activeSpell == SpellType.FireBlast)
