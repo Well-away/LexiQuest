@@ -44,6 +44,11 @@ public class BattleManager : MonoBehaviour
     public List<string> scribesReviewWords = new List<string>(); // Tracks all words!
     public TextMeshProUGUI scribesReviewText; // Drag a UI Text here to show the list on Game Over!
 
+    [Header("Floating Combat Text")]
+    public GameObject floatingTextPrefab; // Drag your new FCT Prefab here
+    public Transform playerFloatingTextSpawn; // Drag an empty GameObject positioned above Amy here
+    public Transform enemyFloatingTextSpawn; // Drag an empty GameObject positioned above the Boss here
+
     [Header("Enemy AI Cooldowns")]
     public int enemyHeavyAttackCD = 0;
     public int enemyHealCD = 0;
@@ -304,11 +309,13 @@ public class BattleManager : MonoBehaviour
             case BattleState.GameOver:
                 if (gameOverPanel != null) gameOverPanel.SetActive(true);
                 
-                string finalScore = "Enemies Defeated: " + enemiesDefeatedCount + "\n\n";
-                finalScore += "<b>SCRIBE'S REVIEW (Words Typed):</b>\n";
-                finalScore += string.Join(", ", scribesReviewWords); // Lists all words separated by a comma!
+                if (scoreText != null) scoreText.text = "Enemies Defeated: " + enemiesDefeatedCount;
                 
-                if (scoreText != null) scoreText.text = finalScore;
+                // PATCH 3: DEDICATED SCRIBE'S REVIEW BOX
+                if (scribesReviewText != null) 
+                {
+                    scribesReviewText.text = string.Join(", ", scribesReviewWords); 
+                }
                 break;
         }
     }
@@ -339,6 +346,15 @@ public class BattleManager : MonoBehaviour
             streakText.gameObject.SetActive(false);
         }
         
+        // --- PATCH 4: INITIAL COOLDOWNS ---
+        spellCooldowns.Clear();
+        spellCooldowns[SpellType.FrostSpikes] = 3;
+        spellCooldowns[SpellType.EarthThrow] = 3;
+        spellCooldowns[SpellType.ThunderStrike] = 3;
+        spellCooldowns[SpellType.ManaShield] = 3;
+        spellCooldowns[SpellType.FlameBarrier] = 3;
+        spellCooldowns[SpellType.GreaterHeal] = 3;
+
         UpdateHealthUI();
         
         ChangeState(BattleState.Intro);
@@ -1054,7 +1070,7 @@ public class BattleManager : MonoBehaviour
             
             if (activeSpell == SpellType.LesserShield)
             {
-                playerDamageReductionPercent = 0.25f; // 25% Reduction
+                playerDamageReductionPercent = 0.25f; 
                 playerDamageReductionTurns = 2;
                 bannerText.text = "LESSER SHIELD ACTIVATED!";
             }
@@ -1062,12 +1078,23 @@ public class BattleManager : MonoBehaviour
             {
                 flameBarrierBurnAmount = currentCastBasePotency * currentSpellPotency * 0.25f;
                 flameBarrierTurns = 2;
+                bannerText.text = "FLAME BARRIER ACTIVATED!";
             }
             else if (activeSpell == SpellType.ManaShield) 
             {
+                // PATCH 2: SHIELD CAP & OVERLAP MATH
                 float shieldAmount = currentCastBasePotency * currentSpellPotency;
-                playerCurrentShield += shieldAmount; 
-                bannerText.text = $"GAINED {Mathf.RoundToInt(shieldAmount)} SHIELD!";
+                
+                if (shieldAmount >= playerCurrentShield) {
+                    playerCurrentShield = shieldAmount; // Replace if greater
+                } else {
+                    playerCurrentShield += (shieldAmount * 0.20f); // Add 20% if lesser
+                }
+                
+                if (playerCurrentShield > 70f) playerCurrentShield = 70f; // Hard cap at 70!
+                
+                bannerText.text = $"SHIELD SECURED!";
+                ShowFloatingText($"Shield", playerFloatingTextSpawn, Color.cyan);
             }
             else if (activeSpell == SpellType.LesserHeal)
             {
@@ -1081,9 +1108,12 @@ public class BattleManager : MonoBehaviour
             }
             else if (activeSpell == SpellType.Purify)
             {
-                playerDebuffImmunityTurns = 2; // Immune this turn and next!
-                // (Clear any existing debuffs here if enemies apply them later)
+                // PATCH 1: PURIFY MATH
+                playerDebuffImmunityTurns = 2; 
+                playerDebuffCount = 0; // Wipe generic debuffs
+                // (If you add Bleed or Poison later, reset those variables to 0 right here!)
                 bannerText.text = "PURIFIED! DEBUFF IMMUNITY SECURED.";
+                ShowFloatingText($"Cleanse", playerFloatingTextSpawn, Color.green);
             }
             else if (activeSpell == SpellType.Focus)
             {
@@ -1114,11 +1144,9 @@ public class BattleManager : MonoBehaviour
             {
                 playerCurrentHP += displayHeal;
                 if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP;
-                bannerText.color = Color.green;
-            }
-            else
-            {
-                bannerText.color = Color.cyan;
+                
+                // Trigger Floating Text above Amy!
+                ShowFloatingText($"+{displayHeal}", playerFloatingTextSpawn, Color.green);
             }
 
             UpdateHealthUI(); 
@@ -1245,9 +1273,14 @@ public class BattleManager : MonoBehaviour
 
                 if (finalEnemyDamage > 0)
                 {
-                    playerCurrentHP -= finalEnemyDamage;
+                    int displayEnemyDamage = Mathf.RoundToInt(finalEnemyDamage);
+                    playerCurrentHP -= displayEnemyDamage;
                     if (playerCurrentHP < 0) playerCurrentHP = 0;
-                    Debug.Log($"<color=orange>Serpent hits Amy for {finalEnemyDamage} damage! Amy HP: {playerCurrentHP}</color>");
+                    
+                    bannerText.color = Color.black; // Keep it black!
+                    
+                    // Spawn Floating Text over Amy!
+                    ShowFloatingText($"-{displayEnemyDamage}", playerFloatingTextSpawn, Color.red);
                 }
             }
 
@@ -1366,6 +1399,15 @@ public class BattleManager : MonoBehaviour
         }
     }
 
+    private void ShowFloatingText(string msg, Transform spawnPoint, Color color)
+    {
+        if (floatingTextPrefab && spawnPoint)
+        {
+            GameObject fct = Instantiate(floatingTextPrefab, spawnPoint.position, Quaternion.identity, spawnPoint);
+            fct.GetComponent<FloatingText>().Setup(msg, color);
+        }
+    }
+
     // Called automatically every time the player types or deletes a letter
     public void OnInputValueChanged(string currentInput)
     {
@@ -1472,22 +1514,22 @@ public class BattleManager : MonoBehaviour
     private int GetMaxCooldown(SpellType spell)
     {
         switch(spell) {
-            case SpellType.MagicMissiles: return 0; // No change
-            case SpellType.LesserShield: return 0;  // No change
-            case SpellType.LesserHeal: return 4;    // Kept at original Soothing Waters CD (4)
+            case SpellType.MagicMissiles: return 0; 
+            case SpellType.LesserShield: return 0;  
+            case SpellType.LesserHeal: return 4;    
             
-            case SpellType.WindBlast: return 4;     // Was 2 -> 4
-            case SpellType.FireBlast: return 5;     // Was 3 -> 5
-            case SpellType.EarthThrow: return 6;    // Was 4 -> 6
-            case SpellType.FrostSpikes: return 6;   // Was 4 -> 6
-            case SpellType.ThunderStrike: return 8; // Was 6 -> 8
+            case SpellType.WindBlast: return 4;     
+            case SpellType.FireBlast: return 5;     
+            case SpellType.EarthThrow: return 6;    
+            case SpellType.FrostSpikes: return 6;   
+            case SpellType.ThunderStrike: return 8; 
             
-            case SpellType.FlameBarrier: return 5;  // Was 3 -> 5
-            case SpellType.ManaShield: return 7;    // Was 5 -> 7
-            case SpellType.Focus: return 10;        // Was 8 -> 10
+            case SpellType.FlameBarrier: return 5;  
+            case SpellType.ManaShield: return 7;    
+            case SpellType.Focus: return 10;       
             
-            case SpellType.Purify: return 6;        // Was 4 -> 6
-            case SpellType.GreaterHeal: return 8;   // Was 6 -> 8
+            case SpellType.Purify: return 5;        
+            case SpellType.GreaterHeal: return 8;   
             default: return 0;
         }
     }
