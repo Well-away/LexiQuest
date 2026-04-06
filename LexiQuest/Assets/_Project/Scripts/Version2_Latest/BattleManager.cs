@@ -147,16 +147,20 @@ public class BattleManager : MonoBehaviour
     [Header("Player Status Effects")]
     public float playerHoTAmount = 0f;       
     public int playerHoTTurns = 0;           
+    public float playerHoTAmount2 = 0f;      // NEW: Second stack for Lesser Heal
+    public int playerHoTTurns2 = 0;          // NEW: Second stack for Lesser Heal
     public int incomingHealBonusTurns = 0;   
     public bool isDamageImmune = false;      
     public int playerBleedTurns = 0;
     public float playerBleedAmount = 0f;
     public int playerDebuffCount = 0;        
     public int playerDebuffImmunityTurns = 0; // For the new Purify!
-    public float playerDamageReductionPercent = 0f; // For the new Lesser Shield!
+    public float playerDamageReductionPercent = 0f; // For WindBlast!
     public int playerDamageReductionTurns = 0;
     public float flameBarrierBurnAmount = 0f; 
     public int flameBarrierTurns = 0;
+    public float playerDelayedShieldAmount = 0f; // NEW: Lesser Shield Next Turn
+    public int playerDelayedShieldTurns = 0;
     public TextMeshProUGUI playerStatusText; // NEW: Drag a Text component here for the UI!
 
     void Start()
@@ -260,18 +264,50 @@ public class BattleManager : MonoBehaviour
                 }
 
                 // --- PROCESS HOTS (Heal Over Time) ---
+                float totalTickHeal = 0f;
+                int maxHoTTurns = 0;
+
                 if (playerHoTTurns > 0)
                 {
-                    float tickHeal = playerHoTAmount;
+                    totalTickHeal += playerHoTAmount;
+                    playerHoTTurns--;
+                    if (playerHoTTurns > maxHoTTurns) maxHoTTurns = playerHoTTurns;
+                }
+
+                if (playerHoTTurns2 > 0)
+                {
+                    totalTickHeal += playerHoTAmount2;
+                    playerHoTTurns2--;
+                    if (playerHoTTurns2 > maxHoTTurns) maxHoTTurns = playerHoTTurns2;
+                }
+
+                if (totalTickHeal > 0)
+                {
+                    float tickHeal = totalTickHeal;
                     if (incomingHealBonusTurns > 0) tickHeal *= 1.5f; // Revitalize bonus
 
                     playerCurrentHP += tickHeal;
                     if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP;
                     
-                    playerHoTTurns--;
                     UpdateHealthUI();
-                    Debug.Log($"<color=green>HoT Tick! Amy healed {tickHeal} HP. {playerHoTTurns} turns of HoT remaining.</color>");
+                    Debug.Log($"<color=green>HoT Tick! Amy healed {tickHeal} HP. {maxHoTTurns} turns of HoT remaining.</color>");
                     ShowFloatingText($"+{Mathf.RoundToInt(tickHeal)}", playerFloatingTextSpawn, Color.green);
+                }
+
+                // --- PROCESS DELAYED SHIELD ---
+                if (playerDelayedShieldTurns > 0)
+                {
+                    if (playerDelayedShieldAmount >= playerCurrentShield) {
+                        playerCurrentShield = playerDelayedShieldAmount; 
+                    } else {
+                        playerCurrentShield += (playerDelayedShieldAmount * 0.20f); 
+                    }
+                    if (playerCurrentShield > 70f) playerCurrentShield = 70f; 
+                    
+                    playerDelayedShieldTurns--;
+                    UpdateHealthUI();
+                    Debug.Log($"<color=cyan>Delayed Shield Tick! Amy gained Shield.</color>");
+                    ShowFloatingText($"Shield", playerFloatingTextSpawn, Color.cyan);
                 }
 
         if (playerBleedTurns > 0)
@@ -368,6 +404,13 @@ public class BattleManager : MonoBehaviour
         enemyTurnSkipCount = 0;
         enemyDamageMultiplier = 1.0f;
         
+        playerHoTTurns = 0;
+        playerHoTAmount = 0f;
+        playerHoTTurns2 = 0;
+        playerHoTAmount2 = 0f;
+        playerDelayedShieldAmount = 0f;
+        playerDelayedShieldTurns = 0;
+
         scribesReviewWords.Clear();
         enemyHeavyAttackCD = 0;
         enemyHealCD = 0;
@@ -844,7 +887,7 @@ public class BattleManager : MonoBehaviour
             case SpellType.ManaShield: spellMultiplier = 1.5f; break;
             case SpellType.Focus: spellMultiplier = 1.0f; break;
             
-            case SpellType.LesserHeal: spellMultiplier = 0.5f; break;
+            case SpellType.LesserHeal: spellMultiplier = 0.4f; break;
             case SpellType.Purify: spellMultiplier = 0.25f; break;
             case SpellType.GreaterHeal: spellMultiplier = 1.0f; break;
         }
@@ -1114,9 +1157,20 @@ public class BattleManager : MonoBehaviour
             
             if (activeSpell == SpellType.LesserShield)
             {
-                playerDamageReductionPercent = 0.25f; 
-                playerDamageReductionTurns = 2;
+                float shieldAmount = currentCastBasePotency * currentSpellPotency * 0.5f;
+                if (shieldAmount >= playerCurrentShield) {
+                    playerCurrentShield = shieldAmount; // Replace if greater
+                } else {
+                    playerCurrentShield += (shieldAmount * 0.20f); // Add 20% if lesser
+                }
+                
+                if (playerCurrentShield > 70f) playerCurrentShield = 70f; // Hard cap at 70!
+
+                playerDelayedShieldAmount = shieldAmount;
+                playerDelayedShieldTurns = 1;
+
                 bannerText.text = "LESSER SHIELD ACTIVATED!";
+                ShowFloatingText($"Shield", playerFloatingTextSpawn, Color.cyan);
             }
             else if (activeSpell == SpellType.FlameBarrier)
             {
@@ -1127,7 +1181,7 @@ public class BattleManager : MonoBehaviour
             else if (activeSpell == SpellType.ManaShield) 
             {
                 // PATCH 2: SHIELD CAP & OVERLAP MATH
-                float shieldAmount = currentCastBasePotency * currentSpellPotency;
+                float shieldAmount = currentCastBasePotency * currentSpellPotency * 1.5f;
                 
                 if (shieldAmount >= playerCurrentShield) {
                     playerCurrentShield = shieldAmount; // Replace if greater
@@ -1142,9 +1196,34 @@ public class BattleManager : MonoBehaviour
             }
             else if (activeSpell == SpellType.LesserHeal)
             {
-                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.5f;
-                playerHoTTurns = 3;
-                bannerText.text = $"REGEN {Mathf.RoundToInt(playerHoTAmount)} HP FOR 3 TURNS!";
+                float newHoT = currentCastBasePotency * currentSpellPotency;
+                
+                if (playerHoTTurns == 0)
+                {
+                    playerHoTAmount = newHoT;
+                    playerHoTTurns = 5;
+                }
+                else if (playerHoTTurns2 == 0)
+                {
+                    playerHoTAmount2 = newHoT;
+                    playerHoTTurns2 = 5;
+                }
+                else
+                {
+                    // Overwrite the one with the lowest turns left
+                    if (playerHoTTurns <= playerHoTTurns2)
+                    {
+                        playerHoTAmount = newHoT;
+                        playerHoTTurns = 5;
+                    }
+                    else
+                    {
+                        playerHoTAmount2 = newHoT;
+                        playerHoTTurns2 = 5;
+                    }
+                }
+
+                bannerText.text = $"REGEN {Mathf.RoundToInt(newHoT)} HP FOR 5 TURNS!";
                 ShowFloatingText($"Regen", playerFloatingTextSpawn, Color.green);
             }
             else if (activeSpell == SpellType.GreaterHeal)
@@ -1264,6 +1343,7 @@ public class BattleManager : MonoBehaviour
             enemyHealCD = 5; // Base 3 + 2 increase
             bannerText.text = "BOSS USED MENDING Winds!";
             bannerText.color = Color.green;
+            ShowFloatingText($"+{Mathf.RoundToInt(healAmount)}", enemyFloatingTextSpawn, Color.green);
         }
         else if (enemyHeavyAttackCD == 0) 
         {
@@ -1435,11 +1515,13 @@ public class BattleManager : MonoBehaviour
         if (playerStatusText != null)
         {
             string pStatus = "";
-            if (playerHoTTurns > 0) pStatus += $"Regen ({playerHoTTurns}) ";
+            int maxHoT = Mathf.Max(playerHoTTurns, playerHoTTurns2);
+            if (maxHoT > 0) pStatus += $"Regen ({maxHoT}) ";
             if (playerBleedTurns > 0) pStatus += $"Poison ({playerBleedTurns}) ";
             if (playerDamageReductionTurns > 0) pStatus += $"WindVeil ({playerDamageReductionTurns}) ";
             if (flameBarrierTurns > 0) pStatus += $"FlameBar ({flameBarrierTurns}) ";
             if (isDamageImmune) pStatus += "Immune! ";
+            if (playerDelayedShieldTurns > 0) pStatus += "EchoShield ";
             if (focusActive) pStatus += "Focused! ";
             playerStatusText.text = pStatus;
         }
@@ -1561,7 +1643,7 @@ public class BattleManager : MonoBehaviour
     {
         switch(spell) {
             case SpellType.MagicMissiles: return 0; 
-            case SpellType.LesserShield: return 0;  
+            case SpellType.LesserShield: return 1;  
             case SpellType.LesserHeal: return 3;    
             
             case SpellType.WindBlast: return 4;     
