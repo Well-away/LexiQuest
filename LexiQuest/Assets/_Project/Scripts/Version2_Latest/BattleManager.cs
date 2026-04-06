@@ -241,6 +241,7 @@ public class BattleManager : MonoBehaviour
                     playerHoTTurns--;
                     UpdateHealthUI();
                     Debug.Log($"<color=green>HoT Tick! Amy healed {tickHeal} HP. {playerHoTTurns} turns of HoT remaining.</color>");
+                    ShowFloatingText($"+{Mathf.RoundToInt(tickHeal)}", playerFloatingTextSpawn, Color.green);
                 }
 
         if (playerBleedTurns > 0)
@@ -1103,8 +1104,10 @@ public class BattleManager : MonoBehaviour
             }
             else if (activeSpell == SpellType.LesserHeal)
             {
-                displayHeal = Mathf.RoundToInt(currentCastBasePotency * currentSpellPotency * 0.5f);
-                bannerText.text = $"HEALED FOR {displayHeal} HP!";
+                playerHoTAmount = currentCastBasePotency * currentSpellPotency * 0.5f;
+                playerHoTTurns = 3;
+                bannerText.text = $"REGEN {Mathf.RoundToInt(playerHoTAmount)} HP FOR 3 TURNS!";
+                ShowFloatingText($"Regen", playerFloatingTextSpawn, Color.green);
             }
             else if (activeSpell == SpellType.GreaterHeal)
             {
@@ -1521,7 +1524,7 @@ public class BattleManager : MonoBehaviour
         switch(spell) {
             case SpellType.MagicMissiles: return 0; 
             case SpellType.LesserShield: return 0;  
-            case SpellType.LesserHeal: return 4;    
+            case SpellType.LesserHeal: return 3;    
             
             case SpellType.WindBlast: return 4;     
             case SpellType.FireBlast: return 5;     
