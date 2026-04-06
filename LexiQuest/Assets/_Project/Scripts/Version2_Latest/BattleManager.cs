@@ -5,11 +5,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-public enum BattleState { MainMenu, Intro, CategorySelect, SpellSelect, QuestIntro, Typing, Resolution, EnemyTurn, GameOver }
+public enum BattleState { MainMenu, Intro, CategorySelect, SpellSelect, QuestIntro, Typing, Resolution, EnemyTurn, GameOver, ScribesReview }
 
 public class BattleManager : MonoBehaviour
 {
     [Header("Combat Stats (Prototype)")]
+    public GameObject healthUIPanel; // NEW: Container for all HP Bars and Texts
     public float playerMaxHP = 100f;
     private float playerCurrentHP;
     public Image playerHealthBar; // Drag the Yellow Bar Image here
@@ -41,6 +42,7 @@ public class BattleManager : MonoBehaviour
     private int enemiesDefeatedCount = 0;
 
     [Header("Scribe's Review")]
+    public GameObject scribesReviewPanel; // NEW: The panel for the Scribe's Review
     public List<string> scribesReviewWords = new List<string>(); // Tracks all words!
     public TextMeshProUGUI scribesReviewText; // Drag a UI Text here to show the list on Game Over!
 
@@ -215,6 +217,34 @@ public class BattleManager : MonoBehaviour
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (categorySelectPanel != null) categorySelectPanel.SetActive(false);
         if (spellSelectPanel != null) spellSelectPanel.SetActive(false);
+        if (scribesReviewPanel != null) scribesReviewPanel.SetActive(false);
+
+        // Hide Health UI in non-combat states (MainMenu, GameOver, ScribesReview)
+        bool showHealth = (currentState != BattleState.MainMenu && currentState != BattleState.GameOver && currentState != BattleState.ScribesReview);
+        if (healthUIPanel != null)
+        {
+            healthUIPanel.SetActive(showHealth);
+        }
+        else
+        {
+            // Fallback if the user hasn't grouped them into a panel yet
+            if (playerHPText != null) playerHPText.gameObject.SetActive(showHealth);
+            if (enemyHPText != null) enemyHPText.gameObject.SetActive(showHealth);
+            if (playerShieldBar != null) playerShieldBar.gameObject.SetActive(showHealth);
+            if (playerStatusText != null) playerStatusText.gameObject.SetActive(showHealth);
+            if (enemyStatusText != null) enemyStatusText.gameObject.SetActive(showHealth);
+            
+            if (playerHealthBar != null) 
+            {
+                if (playerHealthBar.transform.parent != null && playerHealthBar.transform.parent.GetComponent<Canvas>() == null) playerHealthBar.transform.parent.gameObject.SetActive(showHealth);
+                else playerHealthBar.gameObject.SetActive(showHealth);
+            }
+            if (enemyHealthBar != null) 
+            {
+                if (enemyHealthBar.transform.parent != null && enemyHealthBar.transform.parent.GetComponent<Canvas>() == null) enemyHealthBar.transform.parent.gameObject.SetActive(showHealth);
+                else enemyHealthBar.gameObject.SetActive(showHealth);
+            }
+        }
 
         switch (currentState)
         {
@@ -255,7 +285,7 @@ public class BattleManager : MonoBehaviour
             
             if (playerCurrentHP <= 0)
             {
-                ChangeState(BattleState.GameOver);
+                ChangeState(BattleState.ScribesReview);
                 return;
             }
         }
@@ -307,16 +337,18 @@ public class BattleManager : MonoBehaviour
                 // Enemy turn also leaves health bars alone!
                 StartCoroutine(HandleEnemyTurn()); 
                 break;
+            case BattleState.ScribesReview:
+                if (scribesReviewPanel != null) scribesReviewPanel.SetActive(true);
+                
+                if (scribesReviewText != null) 
+                {
+                    scribesReviewText.text = scribesReviewWords.Count > 0 ? string.Join("\n", scribesReviewWords) : "No words cast this run."; 
+                }
+                break;
             case BattleState.GameOver:
                 if (gameOverPanel != null) gameOverPanel.SetActive(true);
                 
                 if (scoreText != null) scoreText.text = "Enemies Defeated: " + enemiesDefeatedCount;
-                
-                // PATCH 3: DEDICATED SCRIBE'S REVIEW BOX
-                if (scribesReviewText != null) 
-                {
-                    scribesReviewText.text = string.Join(", ", scribesReviewWords); 
-                }
                 break;
         }
     }
@@ -429,6 +461,12 @@ public class BattleManager : MonoBehaviour
     {
         // Go back to the previous phase!
         ChangeState(BattleState.CategorySelect);
+    }
+
+    // Called by the new "Next" UI Button on the Scribe's Review Panel
+    public void ProceedToGameOver()
+    {
+        ChangeState(BattleState.GameOver);
     }
 
     // --- PHASE LOGIC ---
@@ -1308,7 +1346,7 @@ public class BattleManager : MonoBehaviour
 
         if (playerCurrentHP <= 0)
         {
-            ChangeState(BattleState.GameOver);
+            ChangeState(BattleState.ScribesReview);
             yield break;
         }
         
