@@ -89,6 +89,7 @@ public class BattleManager : MonoBehaviour
     public TextMeshProUGUI tier1StatusText; // Persistent "Starts with..." text
     public TextMeshProUGUI tier2StatusText; // Persistent "Length..." text
     public TextMeshProUGUI tier3StatusText; // Persistent "Side Quest..." text
+    public TextMeshProUGUI streakText;
 
     [Header("Timer UI")]
     public GameObject timerPanel;
@@ -133,6 +134,8 @@ public class BattleManager : MonoBehaviour
     public int playerHoTTurns = 0;           
     public int incomingHealBonusTurns = 0;   
     public bool isDamageImmune = false;      
+    public int playerBleedTurns = 0;
+    public float playerBleedAmount = 0f;
     public int playerDebuffCount = 0;        
     public float playerDamageReduction = 0f; // Gale Burst / Wind Veil flat block!
     public int playerDamageReductionTurns = 0;
@@ -225,6 +228,22 @@ public class BattleManager : MonoBehaviour
                     UpdateHealthUI();
                     Debug.Log($"<color=green>HoT Tick! Amy healed {tickHeal} HP. {playerHoTTurns} turns of HoT remaining.</color>");
                 }
+
+        if (playerBleedTurns > 0)
+        {
+            playerCurrentHP -= playerBleedAmount;
+            if (playerCurrentHP < 0) playerCurrentHP = 0;
+            
+            playerBleedTurns--;
+            UpdateHealthUI();
+            Debug.Log($"<color=purple>Poison Tick! Amy took {playerBleedAmount} damage. {playerBleedTurns} turns remaining.</color>");
+            
+            if (playerCurrentHP <= 0)
+            {
+                ChangeState(BattleState.GameOver);
+                return;
+            }
+        }
 
                 if (incomingHealBonusTurns > 0) incomingHealBonusTurns--;
                 isDamageImmune = false; // Immunity expires at the start of Amy's next turn!
@@ -698,6 +717,12 @@ public class BattleManager : MonoBehaviour
             Debug.Log($"<color=orange>Streak Broken! Quests Completed: {questsCompleted}</color>");
         }
 
+        if (streakText != null)
+        {
+            if (questStreak > 0) streakText.text = $"Quest Streak: {questStreak}";
+            else streakText.text = ""; // Hide it if they break the streak!
+        }
+
         // --- NEW POTENCY CALCULATION ---
         
         // 1. Core Spell Multipliers
@@ -950,6 +975,7 @@ public class BattleManager : MonoBehaviour
 
             // Apply Frostbite Vulnerability!
             damageDealt *= enemyVulnerability; 
+            enemyVulnerability = 1.0f; // NEW: Consume the Frostbite so it resets AFTER Amy hits!
 
             enemyCurrentHP -= damageDealt;
             if (enemyCurrentHP < 0) enemyCurrentHP = 0;
@@ -1157,10 +1183,16 @@ public class BattleManager : MonoBehaviour
             Debug.Log("<color=red>Wind Serpent uses Raging Tempest! (Heavy Attack)</color>");
             finalEnemyDamage = (enemyBaseDamage * 1.5f) * enemyDamageMultiplier;
         }
-        else // 50% Chance: Light Attack
+        else // 50% Chance: Venomous Bite
         {
-            Debug.Log("<color=red>Wind Serpent uses Sonic Tail! (Light Attack)</color>");
+            Debug.Log("<color=red>Wind Serpent uses Venomous Bite!</color>");
             finalEnemyDamage = enemyBaseDamage * enemyDamageMultiplier;
+            
+            // Apply a Debuff to Amy!
+            playerBleedTurns = 2;
+            playerBleedAmount = 10f;
+            playerDebuffCount = 1; // Now Cleanse will actually detect a debuff!
+            Debug.Log("<color=purple>Amy is Poisoned! She will take 10 damage for 2 turns.</color>");
         }
 
         // Reset weakness/vuln at the end of its turn (unless it's permanent until cleansed)
@@ -1316,6 +1348,7 @@ public class BattleManager : MonoBehaviour
         {
             string pStatus = "";
             if (playerHoTTurns > 0) pStatus += $"Regen ({playerHoTTurns}) ";
+            if (playerBleedTurns > 0) pStatus += $"Poison ({playerBleedTurns}) ";
             if (playerDamageReductionTurns > 0) pStatus += $"WindVeil ({playerDamageReductionTurns}) ";
             if (flameBarrierTurns > 0) pStatus += $"FlameBar ({flameBarrierTurns}) ";
             if (isDamageImmune) pStatus += "Immune! ";
