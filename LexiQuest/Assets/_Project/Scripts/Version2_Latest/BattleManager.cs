@@ -230,21 +230,23 @@ public class BattleManager : MonoBehaviour
         if (spellSelectPanel != null) spellSelectPanel.SetActive(false);
         if (scribesReviewPanel != null) scribesReviewPanel.SetActive(false);
 
-        // Hide Health UI in non-combat states (MainMenu, GameOver, ScribesReview)
-        bool showHealth = (currentState != BattleState.MainMenu && currentState != BattleState.GameOver && currentState != BattleState.ScribesReview);
+        // Hide Health UI in non-combat states and during Typing
+        bool showHealth = (currentState != BattleState.MainMenu && currentState != BattleState.GameOver && currentState != BattleState.ScribesReview && currentState != BattleState.Typing);
+        
         if (healthUIPanel != null)
         {
             healthUIPanel.SetActive(showHealth);
         }
-        else
+        
+        // Enforce visibility for individual components in case they are placed outside the healthUIPanel
+        if (playerHPText != null) playerHPText.gameObject.SetActive(showHealth);
+        if (enemyHPText != null) enemyHPText.gameObject.SetActive(showHealth);
+        if (playerShieldBar != null) playerShieldBar.gameObject.SetActive(showHealth);
+        if (playerStatusText != null) playerStatusText.gameObject.SetActive(showHealth);
+        if (enemyStatusText != null) enemyStatusText.gameObject.SetActive(showHealth);
+
+        if (healthUIPanel == null)
         {
-            // Fallback if the user hasn't grouped them into a panel yet
-            if (playerHPText != null) playerHPText.gameObject.SetActive(showHealth);
-            if (enemyHPText != null) enemyHPText.gameObject.SetActive(showHealth);
-            if (playerShieldBar != null) playerShieldBar.gameObject.SetActive(showHealth);
-            if (playerStatusText != null) playerStatusText.gameObject.SetActive(showHealth);
-            if (enemyStatusText != null) enemyStatusText.gameObject.SetActive(showHealth);
-            
             if (playerHealthBar != null) 
             {
                 if (playerHealthBar.transform.parent != null && playerHealthBar.transform.parent.GetComponent<Canvas>() == null) playerHealthBar.transform.parent.gameObject.SetActive(showHealth);
@@ -255,6 +257,22 @@ public class BattleManager : MonoBehaviour
                 if (enemyHealthBar.transform.parent != null && enemyHealthBar.transform.parent.GetComponent<Canvas>() == null) enemyHealthBar.transform.parent.gameObject.SetActive(showHealth);
                 else enemyHealthBar.gameObject.SetActive(showHealth);
             }
+        }
+
+        // Hide Quest Status texts in phases where no quest is active yet (like Category & Spell selection)
+        bool showQuestStatus = (currentState == BattleState.QuestIntro || currentState == BattleState.Typing || currentState == BattleState.Resolution || currentState == BattleState.EnemyTurn);
+        if (!showQuestStatus)
+        {
+            if (tier1StatusText != null && tier1StatusText.transform.parent != null) tier1StatusText.transform.parent.gameObject.SetActive(false);
+            else if (tier1StatusText != null) tier1StatusText.gameObject.SetActive(false);
+            
+            if (tier2StatusText != null && tier2StatusText.transform.parent != null) tier2StatusText.transform.parent.gameObject.SetActive(false);
+            else if (tier2StatusText != null) tier2StatusText.gameObject.SetActive(false);
+            
+            if (tier3StatusText != null && tier3StatusText.transform.parent != null) tier3StatusText.transform.parent.gameObject.SetActive(false);
+            else if (tier3StatusText != null) tier3StatusText.gameObject.SetActive(false);
+            
+            if (streakText != null) streakText.gameObject.SetActive(false);
         }
 
         switch (currentState)
@@ -336,7 +354,7 @@ public class BattleManager : MonoBehaviour
                 if (incomingHealBonusTurns > 0) incomingHealBonusTurns--;
                 isDamageImmune = false; // Immunity expires at the start of Amy's next turn!
 
-                StartCoroutine(WaitAndChangeState(2f, BattleState.CategorySelect));
+            StartCoroutine(HandleIntro());
                 break;
             case BattleState.CategorySelect:
                 StartCoroutine(HandleCategorySelection());
@@ -463,7 +481,7 @@ public class BattleManager : MonoBehaviour
         List<SpellType> pool = new List<SpellType>();
 
         if (category == SpellCategory.Offensive)
-            pool = new List<SpellType> { SpellType.MagicMissiles, SpellType.WindBlast, SpellType.FireBlast, SpellType.FrostSpikes, SpellType.EarthThrow, SpellType.ThunderStrike };
+            pool = new List<SpellType> { SpellType.ArcaneShot, SpellType.WindBlast, SpellType.FireBlast, SpellType.FrostSpikes, SpellType.EarthThrow, SpellType.ThunderStrike };
         else if (category == SpellCategory.Utility)
             pool = new List<SpellType> { SpellType.LesserShield, SpellType.FlameBarrier, SpellType.ManaShield, SpellType.Focus };
         else if (category == SpellCategory.Healing)
@@ -523,9 +541,10 @@ public class BattleManager : MonoBehaviour
     IEnumerator HandleIntro()
     {
         introBanner.SetActive(true);
+        if (rerollButton != null) rerollButton.gameObject.SetActive(false);
         
         // Actually set the text instead of just commenting it!
-        bannerText.text = "IT's YOUR TURN!"; 
+        bannerText.text = "YOUR TURN!"; 
         
         yield return StartCoroutine(WaitOrSkip(1.5f));
         
@@ -649,8 +668,19 @@ public class BattleManager : MonoBehaviour
 
         // 4. PREPARE TYPING UI
         // Set the persistent side-panel text so the player doesn't forget
-        tier1StatusText.text = "Letter: " + currentQuest.targetLetter;
-        tier2StatusText.text = "Rule: " + currentQuest.tier2Description;
+        if (tier1StatusText != null)
+        {
+            if (tier1StatusText.transform.parent != null) tier1StatusText.transform.parent.gameObject.SetActive(true);
+            tier1StatusText.gameObject.SetActive(true);
+            tier1StatusText.text = "Letter: " + currentQuest.targetLetter;
+        }
+
+        if (tier2StatusText != null)
+        {
+            if (tier2StatusText.transform.parent != null) tier2StatusText.transform.parent.gameObject.SetActive(true);
+            tier2StatusText.gameObject.SetActive(true);
+            tier2StatusText.text = "Rule: " + currentQuest.tier2Description;
+        }
         
         // Show Quest Streak if applicable
         if (streakText != null)
@@ -927,7 +957,7 @@ public class BattleManager : MonoBehaviour
         float spellMultiplier = 1.0f;
         switch(activeSpell)
         {
-            case SpellType.MagicMissiles: spellMultiplier = 0.75f; break;
+            case SpellType.ArcaneShot: spellMultiplier = 0.75f; break;
             case SpellType.WindBlast: spellMultiplier = 1.0f; break;
             case SpellType.FireBlast: spellMultiplier = 1.2f; break;
             case SpellType.FrostSpikes: spellMultiplier = 1.3f; break;
@@ -979,7 +1009,7 @@ public class BattleManager : MonoBehaviour
         }
 
         // 6. Focus Buff
-        bool isOffensive = (activeSpell == SpellType.FireBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.WindBlast || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.MagicMissiles);
+        bool isOffensive = (activeSpell == SpellType.FireBlast || activeSpell == SpellType.FrostSpikes || activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.WindBlast || activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneShot);
         if (isOffensive && focusActive)
         {
             finalPotency *= (1.0f + focusDamageBonus);
@@ -1150,12 +1180,15 @@ public class BattleManager : MonoBehaviour
     IEnumerator HandleResolution()
     {
         // 1. Put the cast spell on cooldown!
-        spellCooldowns[activeSpell] = 2;
+        if (activeSpell != SpellType.ArcaneShot)
+        {
+            spellCooldowns[activeSpell] = 2;
+        }
 
         // 2. Is it an Offensive Spell?
         bool isOffensive = (activeSpell == SpellType.FireBlast || activeSpell == SpellType.FrostSpikes || 
                             activeSpell == SpellType.ThunderStrike || activeSpell == SpellType.WindBlast || 
-                            activeSpell == SpellType.EarthThrow || activeSpell == SpellType.MagicMissiles);
+                            activeSpell == SpellType.EarthThrow || activeSpell == SpellType.ArcaneShot);
 
         introBanner.SetActive(true); // TURN ON THE BANNER FOR COMBAT TEXT!
 
@@ -1163,9 +1196,9 @@ public class BattleManager : MonoBehaviour
         {
             float damageDealt = currentCastBasePotency * currentSpellPotency;
             
-            if (activeSpell == SpellType.MagicMissiles && Random.value <= 0.15f)
+            if (activeSpell == SpellType.ArcaneShot && Random.value <= 0.25f)
             {
-                damageDealt *= 1.2f;
+                damageDealt *= 1.5f;
                 Debug.Log("CRIT!");
             }
 
@@ -1249,16 +1282,23 @@ public class BattleManager : MonoBehaviour
             else if (activeSpell == SpellType.LesserHeal)
             {
                 float newHoT = currentCastBasePotency * currentSpellPotency;
-                
+
+                // --- IMMEDIATE HEAL ---
+                playerCurrentHP += newHoT;
+                if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP;
+                ShowFloatingText($"+{Mathf.RoundToInt(newHoT)} HP", playerFloatingTextSpawn, Color.green);
+                Debug.Log($"<color=green>Lesser Heal provides an initial heal of {newHoT}.</color>");
+
+                // --- SETUP HoT FOR FUTURE TURNS ---
                 if (playerHoTTurns == 0)
                 {
                     playerHoTAmount = newHoT;
-                    playerHoTTurns = 5;
+                    playerHoTTurns = 4; // 4 remaining turns
                 }
                 else if (playerHoTTurns2 == 0)
                 {
                     playerHoTAmount2 = newHoT;
-                    playerHoTTurns2 = 5;
+                    playerHoTTurns2 = 4; // 4 remaining turns
                 }
                 else
                 {
@@ -1266,17 +1306,16 @@ public class BattleManager : MonoBehaviour
                     if (playerHoTTurns <= playerHoTTurns2)
                     {
                         playerHoTAmount = newHoT;
-                        playerHoTTurns = 5;
+                        playerHoTTurns = 4;
                     }
                     else
                     {
                         playerHoTAmount2 = newHoT;
-                        playerHoTTurns2 = 5;
+                        playerHoTTurns2 = 4;
                     }
                 }
 
-                bannerText.text = "REGEN ACTIVATED FOR 5 TURNS!";
-                ShowFloatingText($"Regen", playerFloatingTextSpawn, Color.green);
+                bannerText.text = "REGEN ACTIVATED FOR 4 TURNS!";
             }
             else if (activeSpell == SpellType.GreaterHeal)
             {
@@ -1480,16 +1519,48 @@ public class BattleManager : MonoBehaviour
             // D. Flame Barrier Retaliation!
             if (flameBarrierTurns > 0)
             {
-                enemyBurnAmount = flameBarrierBurnAmount;
-                enemyBurnTurns = 2; // Ignites the enemy!
+                // --- IMMEDIATE BURN ---
+                float burnDamage = flameBarrierBurnAmount;
+                enemyCurrentHP -= burnDamage;
+                ShowFloatingText($"-{Mathf.RoundToInt(burnDamage)} Burn", enemyFloatingTextSpawn, Color.red);
+                Debug.Log($"<color=red>Flame Barrier retaliates with an initial burn of {burnDamage}.</color>");
+
+                // --- SETUP DoT FOR FUTURE TURNS ---
+                enemyBurnAmount = flameBarrierBurnAmount; // Set the amount for subsequent ticks
+                enemyBurnTurns = 1; // 1 remaining turn
                 flameBarrierTurns--;
-                Debug.Log($"<color=red>Flame Barrier triggered! Enemy ignited for {enemyBurnAmount} damage for 2 turns.</color>");
             }
         }
 
         UpdateHealthUI();
         yield return new WaitForSeconds(3.0f);
         introBanner.SetActive(false);
+
+        // Check for Boss Death from retaliation
+        if (enemyCurrentHP <= 0)
+        {
+            Debug.Log("<color=green>Enemy Defeated by Retaliation! A new challenger appears!</color>");
+            enemiesDefeatedCount++;
+            
+            enemyMaxHP += 20f;
+            enemyBaseDamage += 3f;
+            baseSpellPotency += 1f;
+
+            enemyCurrentHP = enemyMaxHP; 
+            
+            // Clear enemy debuffs and cooldowns for the new boss
+            enemyBurnTurns = 0;
+            enemyBurnAmount = 0f;
+            enemyVulnerability = 1.0f;
+            enemyDamageMultiplier = 1.0f;
+            enemyTurnSkipCount = 0;
+            enemyHeavyAttackCD = 0;
+            enemyHealCD = 0;
+
+            UpdateHealthUI();
+            ChangeState(BattleState.Intro);
+            yield break; 
+        }
 
         if (playerCurrentHP <= 0)
         {

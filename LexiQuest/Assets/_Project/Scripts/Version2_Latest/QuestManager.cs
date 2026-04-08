@@ -23,7 +23,7 @@ public enum SpellType
 { 
     None, 
     // Offensive
-    MagicMissiles, WindBlast, FireBlast, FrostSpikes, EarthThrow, ThunderStrike, 
+    ArcaneShot, WindBlast, FireBlast, FrostSpikes, EarthThrow, ThunderStrike, 
     // Utility
     LesserShield, FlameBarrier, ManaShield, Focus,
     // Healing
@@ -142,7 +142,7 @@ public class QuestManager : MonoBehaviour
         switch (chosenSpell)
         {
             // OFFENSIVE
-            case SpellType.MagicMissiles: return new[] { Tier2Type.None }; // Very Easy
+            case SpellType.ArcaneShot: return new[] { Tier2Type.None }; // Very Easy
             case SpellType.WindBlast: return new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.ExactLength_5 }; // Easy
             case SpellType.FireBlast: return new[] { Tier2Type.EndsWith_ER, Tier2Type.EndsWith_ING, Tier2Type.ExactLength_6 }; // Medium
             case SpellType.FrostSpikes: return new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_E, Tier2Type.ExactLength_7 }; // Hard
