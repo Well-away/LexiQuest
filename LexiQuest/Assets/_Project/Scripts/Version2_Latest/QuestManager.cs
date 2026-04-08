@@ -142,23 +142,23 @@ public class QuestManager : MonoBehaviour
         switch (chosenSpell)
         {
             // OFFENSIVE
-            case SpellType.MagicMissiles: return new[] { Tier2Type.None };
-            case SpellType.WindBlast: return new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER };
-            case SpellType.FireBlast: return new[] { Tier2Type.ExactLength_5, Tier2Type.ExactLength_6, Tier2Type.ExactLength_7, Tier2Type.ExactLength_8 };
-            case SpellType.FrostSpikes: return new[] { Tier2Type.No_Letter_T, Tier2Type.No_Letter_R, Tier2Type.No_Letter_S, Tier2Type.No_Letter_U };
-            case SpellType.EarthThrow: return new[] { Tier2Type.No_Letter_U, Tier2Type.No_Letter_O, Tier2Type.No_Letter_C, Tier2Type.No_Letter_P };
-            case SpellType.ThunderStrike: return new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 };
+            case SpellType.MagicMissiles: return new[] { Tier2Type.None }; // Very Easy
+            case SpellType.WindBlast: return new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.ExactLength_5 }; // Easy
+            case SpellType.FireBlast: return new[] { Tier2Type.EndsWith_ER, Tier2Type.EndsWith_ING, Tier2Type.ExactLength_6 }; // Medium
+            case SpellType.FrostSpikes: return new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_E, Tier2Type.ExactLength_7 }; // Hard
+            case SpellType.EarthThrow: return new[] { Tier2Type.EndsWith_LY, Tier2Type.ExactLength_8, Tier2Type.No_Letter_I }; // Very Hard
+            case SpellType.ThunderStrike: return new[] { Tier2Type.EndsWith_TION, Tier2Type.ExactLength_9, Tier2Type.MinLength_8 }; // Extreme
             
             // UTILITY
-            case SpellType.LesserShield: return new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_O, Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_N };
-            case SpellType.FlameBarrier: return new[] { Tier2Type.EndsWith_Y, Tier2Type.EndsWith_E, Tier2Type.EndsWith_LY, Tier2Type.EndsWith_N };
-            case SpellType.ManaShield: return new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 };
-            case SpellType.Focus: return new[] { Tier2Type.MinLength_6, Tier2Type.EndsWith_ING, Tier2Type.No_Letter_A };
+            case SpellType.LesserShield: return new[] { Tier2Type.MinLength_5, Tier2Type.ExactLength_5 }; // Easy
+            case SpellType.FlameBarrier: return new[] { Tier2Type.ExactLength_6, Tier2Type.EndsWith_Y, Tier2Type.No_Letter_O }; // Medium
+            case SpellType.ManaShield: return new[] { Tier2Type.ExactLength_8, Tier2Type.EndsWith_TION, Tier2Type.No_Letter_E }; // Hard
+            case SpellType.Focus: return new[] { Tier2Type.ExactLength_8, Tier2Type.EndsWith_LY, Tier2Type.MinLength_8 }; // Hard
 
             // HEALING
-            case SpellType.LesserHeal: return new[] { Tier2Type.MinLength_5 };
-            case SpellType.Purify: return new[] { Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.ExactLength_6 };
-            case SpellType.GreaterHeal: return new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ING };
+            case SpellType.LesserHeal: return new[] { Tier2Type.MinLength_5, Tier2Type.ExactLength_5 }; // Easy
+            case SpellType.Purify: return new[] { Tier2Type.ExactLength_6, Tier2Type.EndsWith_ING }; // Medium
+            case SpellType.GreaterHeal: return new[] { Tier2Type.ExactLength_8, Tier2Type.EndsWith_TION, Tier2Type.EndsWith_LY }; // Hard
 
             default: return new[] { Tier2Type.MinLength_5 };
         }

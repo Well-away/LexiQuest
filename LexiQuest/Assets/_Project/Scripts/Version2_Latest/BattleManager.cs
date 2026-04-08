@@ -64,8 +64,9 @@ public class BattleManager : MonoBehaviour
     private SpellType activeSpell;
     private SpellType[] currentlyDisplayedSpells = new SpellType[6]; // Expanded to 6!
 
-    [Header("Cooldown & Status Memory")]
     public Dictionary<SpellType, int> spellCooldowns = new Dictionary<SpellType, int>();
+
+    [Header("Status Memory")]
     public bool focusActive = false;
     public float focusDamageBonus = 0f;
     private int lastWordLength = 0;
@@ -262,7 +263,7 @@ public class BattleManager : MonoBehaviour
                 if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
                 break;
             case BattleState.Intro:
-                // Reduce all active cooldowns by 1!
+                // --- REDUCE COOLDOWNS ---
                 List<SpellType> keys = new List<SpellType>(spellCooldowns.Keys);
                 foreach (SpellType key in keys)
                 {
@@ -413,6 +414,9 @@ public class BattleManager : MonoBehaviour
         enemiesDefeatedCount = 0;
         enemyTurnSkipCount = 0;
         enemyDamageMultiplier = 1.0f;
+        enemyVulnerability = 1.0f;
+        enemyBurnTurns = 0;
+        enemyBurnAmount = 0f;
         
         playerHoTTurns = 0;
         playerHoTAmount = 0f;
@@ -425,6 +429,8 @@ public class BattleManager : MonoBehaviour
         enemyHeavyAttackCD = 0;
         enemyHealCD = 0;
         
+        spellCooldowns.Clear();
+
         questStreak = 0;
         if (streakText != null)
         {
@@ -432,15 +438,6 @@ public class BattleManager : MonoBehaviour
             streakText.gameObject.SetActive(false);
         }
         
-        // --- PATCH 4: INITIAL COOLDOWNS ---
-        spellCooldowns.Clear();
-        spellCooldowns[SpellType.FrostSpikes] = 3;
-        spellCooldowns[SpellType.EarthThrow] = 3;
-        spellCooldowns[SpellType.ThunderStrike] = 3;
-        spellCooldowns[SpellType.ManaShield] = 3;
-        spellCooldowns[SpellType.FlameBarrier] = 3;
-        spellCooldowns[SpellType.GreaterHeal] = 3;
-
         UpdateHealthUI();
         
         ChangeState(BattleState.Intro);
@@ -481,7 +478,6 @@ public class BattleManager : MonoBehaviour
                 currentlyDisplayedSpells[i] = pool[i];
                 SpellType s = pool[i];
 
-                // Check cooldowns
                 int cd = spellCooldowns.ContainsKey(s) ? spellCooldowns[s] : 0;
                 spellButtons[i].interactable = (cd == 0); // Lock button if CD > 0
 
@@ -1153,8 +1149,8 @@ public class BattleManager : MonoBehaviour
 
     IEnumerator HandleResolution()
     {
-        // 1. Put the cast spell on cooldown immediately!
-        spellCooldowns[activeSpell] = GetMaxCooldown(activeSpell);
+        // 1. Put the cast spell on cooldown!
+        spellCooldowns[activeSpell] = 2;
 
         // 2. Is it an Offensive Spell?
         bool isOffensive = (activeSpell == SpellType.FireBlast || activeSpell == SpellType.FrostSpikes || 
@@ -1308,16 +1304,9 @@ public class BattleManager : MonoBehaviour
                 focusActive = true;
                 focusDamageBonus = bonus;
 
-                // Reduce all active CDs to 1!
-                List<SpellType> keys = new List<SpellType>(spellCooldowns.Keys);
-                foreach (SpellType key in keys)
-                {
-                    if (spellCooldowns[key] > 1) spellCooldowns[key] = 1;
-                }
-
-                Debug.Log($"<color=yellow>FOCUS CAST! All CDs set to 1. Next attack gains +{bonus * 100}% Potency!</color>");
+                Debug.Log($"<color=yellow>FOCUS CAST! Next attack gains +{bonus * 100}% Potency!</color>");
                 
-                bannerText.text = "FOCUS! COOLDOWNS RESET.";
+                bannerText.text = "FOCUS! DAMAGE BOOSTED.";
             }
 
             // Apply the instant heals
@@ -1349,9 +1338,19 @@ public class BattleManager : MonoBehaviour
             baseSpellPotency += 1f;
 
             enemyCurrentHP = enemyMaxHP; 
+            
+            // Clear enemy debuffs and cooldowns for the new boss
+            enemyBurnTurns = 0;
+            enemyBurnAmount = 0f;
+            enemyVulnerability = 1.0f;
+            enemyDamageMultiplier = 1.0f;
+            enemyTurnSkipCount = 0;
+            enemyHeavyAttackCD = 0;
+            enemyHealCD = 0;
+
             UpdateHealthUI();
             
-            ChangeState(BattleState.QuestIntro);
+            ChangeState(BattleState.Intro);
             yield break; 
         }
         
@@ -1378,7 +1377,7 @@ public class BattleManager : MonoBehaviour
                 
                 enemyCurrentHP = enemyMaxHP;
                 UpdateHealthUI();
-                ChangeState(BattleState.QuestIntro);
+                ChangeState(BattleState.Intro);
                 yield break;
             }
         }
@@ -1687,7 +1686,7 @@ public class BattleManager : MonoBehaviour
 
     private IEnumerator RollAnimation(string prefix, string finalValue, string suffix)
     {
-        float rollDuration = 2.0f;
+        float rollDuration = 1.5f;
         float elapsed = 0f;
         float tickRate = 0.05f;
 
@@ -1764,28 +1763,5 @@ public class BattleManager : MonoBehaviour
         // If it's an Easy rule, block 2 words. If Medium/Hard, only block 1!
         if (easyRules.Contains(rule)) return 2;
         return 1; 
-    }
-
-    private int GetMaxCooldown(SpellType spell)
-    {
-        switch(spell) {
-            case SpellType.MagicMissiles: return 0; 
-            case SpellType.LesserShield: return 1;  
-            case SpellType.LesserHeal: return 3;    
-            
-            case SpellType.WindBlast: return 4;     
-            case SpellType.FireBlast: return 5;     
-            case SpellType.EarthThrow: return 6;    
-            case SpellType.FrostSpikes: return 6;   
-            case SpellType.ThunderStrike: return 8; 
-            
-            case SpellType.FlameBarrier: return 5;  
-            case SpellType.ManaShield: return 7;    
-            case SpellType.Focus: return 10;       
-            
-            case SpellType.Purify: return 5;        
-            case SpellType.GreaterHeal: return 8;   
-            default: return 0;
-        }
     }
 }
