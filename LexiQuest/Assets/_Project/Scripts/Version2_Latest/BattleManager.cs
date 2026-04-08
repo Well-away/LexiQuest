@@ -20,14 +20,14 @@ public class BattleManager : MonoBehaviour
     public float playerCurrentShield = 0f;
     public Image playerShieldBar; // Drag the White Bar Image here!
 
-    public float enemyMaxHP = 300f; // Boss Tier Health!
+    public float enemyMaxHP = 100f; // Boss Tier Health!
     private float enemyCurrentHP;
     public Image enemyHealthBar; // Drag the Red Bar Image here
     public TextMeshProUGUI enemyHPText; // NEW: The text showing the Boss's HP
 
     public float baseSpellPotency = 10f; // REDUCED TO 10
     private float currentCastBasePotency; // Holds Base + Flat Length Bonus!
-    public float enemyBaseDamage = 25f;
+    public float enemyBaseDamage = 15f;
     private float currentSpellPotency = 1.0f;
     
     public int questStreak = 0; // NEW: Tracks consecutive double-quest completions!
@@ -98,6 +98,12 @@ public class BattleManager : MonoBehaviour
     [Header("Clutch Suggestions")]
     public GameObject suggestionPanel;
     public TextMeshProUGUI suggestionText;
+
+    [Header("Reroll Feature")]
+    public Button rerollButton;
+    private bool hasUsedReroll = false;
+    private bool isWaitingForReroll = false;
+    private bool wantsToReroll = false;
 
     [Header("Quest UI Text")]
     public TextMeshProUGUI bannerText; // The text on your IntroBanner
@@ -345,16 +351,16 @@ public class BattleManager : MonoBehaviour
                 break;
             case BattleState.Typing:
                 // --- THESIS GOAL 3: DYNAMIC TIMERS ---
-                float calculatedTimer = 30f; // Base time for standard constraints
+                float calculatedTimer = 40f; // Base time for standard constraints
                 
                 switch(currentQuest.tier2Rule)
                 {
-                    case Tier2Type.ExactLength_4: calculatedTimer = 40f; break; // 30 + 10
-                    case Tier2Type.ExactLength_5: calculatedTimer = 50f; break; // 30 + 20
-                    case Tier2Type.ExactLength_6: calculatedTimer = 60f; break; // 30 + 30
-                    case Tier2Type.ExactLength_7: calculatedTimer = 70f; break; // 30 + 40
-                    case Tier2Type.ExactLength_8: calculatedTimer = 80f; break; // 30 + 50
-                    case Tier2Type.ExactLength_9: calculatedTimer = 90f; break; // 30 + 60
+                    case Tier2Type.ExactLength_4: calculatedTimer = 50f; break; // 40 + 10
+                    case Tier2Type.ExactLength_5: calculatedTimer = 60f; break; // 40 + 20
+                    case Tier2Type.ExactLength_6: calculatedTimer = 70f; break; // 40 + 30
+                    case Tier2Type.ExactLength_7: calculatedTimer = 80f; break; // 40 + 40
+                    case Tier2Type.ExactLength_8: calculatedTimer = 90f; break; // 40 + 50
+                    case Tier2Type.ExactLength_9: calculatedTimer = 100f; break; // 40 + 60
                 }
 
                 // Set your typing timer variables here!
@@ -397,6 +403,10 @@ public class BattleManager : MonoBehaviour
 
     public void StartEndlessGame()
     {
+        enemyMaxHP = 100f;
+        enemyBaseDamage = 15f;
+        baseSpellPotency = 10f;
+
         playerCurrentHP = playerMaxHP;
         enemyCurrentHP = enemyMaxHP;
         playerCurrentShield = 0f;
@@ -563,14 +573,60 @@ public class BattleManager : MonoBehaviour
     {
         
         introBanner.SetActive(true);
-        bannerText.text = "QUEST 1: Starts with '" + currentQuest.targetLetter + "'";
-        yield return StartCoroutine(WaitOrSkip(2.5f));
+        
+        hasUsedReroll = false;
+        if (rerollButton != null) 
+        {
+            rerollButton.gameObject.SetActive(true);
+            rerollButton.interactable = true;
+        }
 
+        // --- QUEST 1: THE LETTER ---
+        yield return StartCoroutine(RollAnimation("QUEST 1: Starts with '", currentQuest.targetLetter, "'"));
+        bannerText.text = "QUEST 1: Starts with '" + currentQuest.targetLetter + "'";
+        
+        yield return StartCoroutine(WaitForRerollWindow());
+
+        if (wantsToReroll)
+        {
+            wantsToReroll = false;
+            hasUsedReroll = true;
+            if (rerollButton != null) rerollButton.interactable = false;
+
+            currentQuest.targetLetter = questManager.RerollLetter(currentQuest.targetLetter);
+            yield return StartCoroutine(RollAnimation("QUEST 1: Starts with '", currentQuest.targetLetter, "'"));
+            bannerText.text = "QUEST 1: Starts with '" + currentQuest.targetLetter + "'";
+            yield return StartCoroutine(WaitOrSkip(1.5f)); // Give a brief moment to process the new letter
+        }
+
+        // --- QUEST 2: THE RULE ---
         if (currentQuest.tier2Rule != Tier2Type.None)
         {
+            // Give a fresh reroll for Q2!
+            hasUsedReroll = false;
+            if (rerollButton != null) rerollButton.interactable = true;
+
+            yield return StartCoroutine(RollAnimation("QUEST 2: ", currentQuest.tier2Description, ""));
             bannerText.text = "QUEST 2: " + currentQuest.tier2Description;
-            yield return StartCoroutine(WaitOrSkip(2.5f));
+
+            yield return StartCoroutine(WaitForRerollWindow());
+
+            if (wantsToReroll)
+            {
+                wantsToReroll = false;
+                hasUsedReroll = true;
+                if (rerollButton != null) rerollButton.interactable = false;
+
+                currentQuest.tier2Rule = questManager.RerollTier2Rule(activeSpell, currentQuest.tier2Rule, currentQuest.targetLetter);
+                currentQuest.tier2Description = questManager.GetTier2Description(currentQuest.tier2Rule);
+
+                yield return StartCoroutine(RollAnimation("QUEST 2: ", currentQuest.tier2Description, ""));
+                bannerText.text = "QUEST 2: " + currentQuest.tier2Description;
+                yield return StartCoroutine(WaitOrSkip(1.5f));
+            }
         }
+
+        if (rerollButton != null) rerollButton.gameObject.SetActive(false);
 
         // ==========================================
         // 3. NEW: THE DYNAMIC BLOCKED WORDS BANNER
@@ -1223,13 +1279,13 @@ public class BattleManager : MonoBehaviour
                     }
                 }
 
-                bannerText.text = $"REGEN {Mathf.RoundToInt(newHoT)} HP FOR 5 TURNS!";
+                bannerText.text = "REGEN ACTIVATED FOR 5 TURNS!";
                 ShowFloatingText($"Regen", playerFloatingTextSpawn, Color.green);
             }
             else if (activeSpell == SpellType.GreaterHeal)
             {
                 displayHeal = Mathf.RoundToInt(currentCastBasePotency * currentSpellPotency * 1.0f);
-                bannerText.text = $"HEALED FOR {displayHeal} HP!";
+                bannerText.text = "GREATER HEAL ACTIVATED!";
             }
             else if (activeSpell == SpellType.Purify)
             {
@@ -1271,7 +1327,7 @@ public class BattleManager : MonoBehaviour
                 if (playerCurrentHP > playerMaxHP) playerCurrentHP = playerMaxHP;
                 
                 // Trigger Floating Text above Amy!
-                ShowFloatingText($"+{displayHeal}", playerFloatingTextSpawn, Color.green);
+                ShowFloatingText($"+{displayHeal} HP", playerFloatingTextSpawn, Color.green);
             }
 
             UpdateHealthUI(); 
@@ -1288,6 +1344,10 @@ public class BattleManager : MonoBehaviour
             Debug.Log("<color=green>Enemy Defeated! A new challenger appears!</color>");
             enemiesDefeatedCount++;
             
+            enemyMaxHP += 20f;
+            enemyBaseDamage += 3f;
+            baseSpellPotency += 1f;
+
             enemyCurrentHP = enemyMaxHP; 
             UpdateHealthUI();
             
@@ -1309,6 +1369,14 @@ public class BattleManager : MonoBehaviour
             if (enemyCurrentHP <= 0) 
             {
                 // Died to burn!
+                Debug.Log("<color=green>Enemy Defeated by Burn! A new challenger appears!</color>");
+                enemiesDefeatedCount++;
+                
+                enemyMaxHP += 20f;
+                enemyBaseDamage += 3f;
+                baseSpellPotency += 1f;
+                
+                enemyCurrentHP = enemyMaxHP;
                 UpdateHealthUI();
                 ChangeState(BattleState.QuestIntro);
                 yield break;
@@ -1341,9 +1409,9 @@ public class BattleManager : MonoBehaviour
             if (enemyCurrentHP > enemyMaxHP) enemyCurrentHP = enemyMaxHP;
             
             enemyHealCD = 5; // Base 3 + 2 increase
-            bannerText.text = "BOSS USED MENDING Winds!";
-            bannerText.color = Color.green;
-            ShowFloatingText($"+{Mathf.RoundToInt(healAmount)}", enemyFloatingTextSpawn, Color.green);
+            bannerText.text = "BOSS USED MENDING WINDS!";
+            bannerText.color = Color.black;
+            ShowFloatingText($"+{Mathf.RoundToInt(healAmount)} HP", enemyFloatingTextSpawn, Color.green);
         }
         else if (enemyHeavyAttackCD == 0) 
         {
@@ -1607,6 +1675,65 @@ public class BattleManager : MonoBehaviour
         }
         
         isBannerSkipped = false; // Reset it again for the next banner!
+    }
+
+    public void OnRerollClicked()
+    {
+        if (isWaitingForReroll && !hasUsedReroll)
+        {
+            wantsToReroll = true;
+        }
+    }
+
+    private IEnumerator RollAnimation(string prefix, string finalValue, string suffix)
+    {
+        float rollDuration = 2.0f;
+        float elapsed = 0f;
+        float tickRate = 0.05f;
+
+        while (elapsed < rollDuration && !isBannerSkipped)
+        {
+            string randomVal = "";
+            if (finalValue.Length <= 2) 
+            {
+                char randomChar = (char)Random.Range(65, 91);
+                randomVal = randomChar.ToString();
+            }
+            else 
+            {
+                string[] fakeRules = { "Exactly 5 letters", "Ends in -S", "Does NOT contain 'A'", "6 or more letters", "Ends in -ING" };
+                randomVal = fakeRules[Random.Range(0, fakeRules.Length)];
+            }
+
+            bannerText.text = prefix + randomVal + suffix;
+            
+            float tickElapsed = 0f;
+            while(tickElapsed < tickRate && !isBannerSkipped)
+            {
+                tickElapsed += Time.deltaTime;
+                yield return null;
+            }
+            elapsed += tickRate;
+        }
+        isBannerSkipped = false;
+    }
+
+    private IEnumerator WaitForRerollWindow()
+    {
+        isWaitingForReroll = true;
+        wantsToReroll = false;
+        
+        float waitTime = 10.0f;
+        float elapsed = 0f;
+        
+        while (elapsed < waitTime && !isBannerSkipped && !wantsToReroll)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        
+        isWaitingForReroll = false;
+        isBannerSkipped = false;
     }
 
     private void RecordSuccessfulWord(string word, string prefix)

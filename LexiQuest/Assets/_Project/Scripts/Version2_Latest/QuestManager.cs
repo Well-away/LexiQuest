@@ -81,31 +81,7 @@ public class QuestManager : MonoBehaviour
         remainingLetters.RemoveAt(0);
         newQuest.tier1Description = "Word starting with '" + newQuest.targetLetter + "'";
 
-        // --- THE FULL SPELL CONSTRAINT POOL ---
-        Tier2Type[] spellRules;
-        switch (chosenSpell)
-        {
-            // OFFENSIVE
-            case SpellType.MagicMissiles: spellRules = new[] { Tier2Type.None }; break;
-            case SpellType.WindBlast: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER }; break;
-            case SpellType.FireBlast: spellRules = new[] { Tier2Type.ExactLength_5, Tier2Type.ExactLength_6, Tier2Type.ExactLength_7, Tier2Type.ExactLength_8 }; break;
-            case SpellType.FrostSpikes: spellRules = new[] { Tier2Type.No_Letter_T, Tier2Type.No_Letter_R, Tier2Type.No_Letter_S, Tier2Type.No_Letter_U }; break;
-            case SpellType.EarthThrow: spellRules = new[] { Tier2Type.No_Letter_U, Tier2Type.No_Letter_O, Tier2Type.No_Letter_C, Tier2Type.No_Letter_P }; break;
-            case SpellType.ThunderStrike: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
-            
-            // UTILITY
-            case SpellType.LesserShield: spellRules = new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_O, Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_N }; break;
-            case SpellType.FlameBarrier: spellRules = new[] { Tier2Type.EndsWith_Y, Tier2Type.EndsWith_E, Tier2Type.EndsWith_LY, Tier2Type.EndsWith_N }; break;
-            case SpellType.ManaShield: spellRules = new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 }; break;
-            case SpellType.Focus: spellRules = new[] { Tier2Type.MinLength_6, Tier2Type.EndsWith_ING, Tier2Type.No_Letter_A }; break;
-
-            // HEALING
-            case SpellType.LesserHeal: spellRules = new[] { Tier2Type.MinLength_5 }; break; 
-            case SpellType.Purify: spellRules = new[] { Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.ExactLength_6 }; break;
-            case SpellType.GreaterHeal: spellRules = new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ING }; break;
-
-            default: spellRules = new[] { Tier2Type.MinLength_5 }; break;
-        }
+        Tier2Type[] spellRules = GetSpellRules(chosenSpell);
 
         do 
         {
@@ -131,42 +107,7 @@ public class QuestManager : MonoBehaviour
             newQuest.tier3Description = "";
         }
 
-        switch (newQuest.tier2Rule)
-        {
-            case Tier2Type.None: newQuest.tier2Description = "No secondary constraint"; break;
-            case Tier2Type.ExactLength_4: newQuest.tier2Description = "Exactly 4 letters"; break;
-            case Tier2Type.ExactLength_5: newQuest.tier2Description = "Exactly 5 letters"; break;
-            case Tier2Type.ExactLength_6: newQuest.tier2Description = "Exactly 6 letters"; break;
-            case Tier2Type.ExactLength_7: newQuest.tier2Description = "Exactly 7 letters"; break;
-            case Tier2Type.ExactLength_8: newQuest.tier2Description = "Exactly 8 letters"; break;
-            case Tier2Type.ExactLength_9: newQuest.tier2Description = "Exactly 9 letters"; break;
-            case Tier2Type.MinLength_5: newQuest.tier2Description = "5 or more letters"; break;
-            case Tier2Type.MinLength_6: newQuest.tier2Description = "6 or more letters"; break;
-            case Tier2Type.MinLength_7: newQuest.tier2Description = "7 or more letters"; break;
-            case Tier2Type.MinLength_8: newQuest.tier2Description = "8 or more letters"; break;
-            case Tier2Type.EndsWith_S: newQuest.tier2Description = "Ends in -S or -ES"; break;
-            case Tier2Type.EndsWith_ED: newQuest.tier2Description = "Ends in -D or -ED"; break;
-            case Tier2Type.EndsWith_ER: newQuest.tier2Description = "Ends in -R or -ER"; break;
-            case Tier2Type.EndsWith_ING: newQuest.tier2Description = "Ends in -ING"; break;
-            case Tier2Type.EndsWith_LY: newQuest.tier2Description = "Ends in -LY"; break;
-            case Tier2Type.EndsWith_Y: newQuest.tier2Description = "Ends in -Y"; break;
-            case Tier2Type.EndsWith_T: newQuest.tier2Description = "Ends in -T"; break;
-            case Tier2Type.EndsWith_N: newQuest.tier2Description = "Ends in -N"; break;
-            case Tier2Type.EndsWith_E: newQuest.tier2Description = "Ends in -E"; break;
-            case Tier2Type.EndsWith_TION: newQuest.tier2Description = "Ends in -TION"; break;
-            case Tier2Type.No_Letter_A: newQuest.tier2Description = "Does NOT contain 'A'"; break;
-            case Tier2Type.No_Letter_E: newQuest.tier2Description = "Does NOT contain 'E'"; break;
-            case Tier2Type.No_Letter_I: newQuest.tier2Description = "Does NOT contain 'I'"; break;
-            case Tier2Type.No_Letter_O: newQuest.tier2Description = "Does NOT contain 'O'"; break;
-            case Tier2Type.No_Letter_U: newQuest.tier2Description = "Does NOT contain 'U'"; break;
-            case Tier2Type.No_Letter_T: newQuest.tier2Description = "Does NOT contain 'T'"; break;
-            case Tier2Type.No_Letter_S: newQuest.tier2Description = "Does NOT contain 'S'"; break;
-            case Tier2Type.No_Letter_R: newQuest.tier2Description = "Does NOT contain 'R'"; break;
-            case Tier2Type.No_Letter_N: newQuest.tier2Description = "Does NOT contain 'N'"; break;
-            case Tier2Type.No_Letter_L: newQuest.tier2Description = "Does NOT contain 'L'"; break;
-            case Tier2Type.No_Letter_P: newQuest.tier2Description = "Does NOT contain 'P'"; break;
-            case Tier2Type.No_Letter_C: newQuest.tier2Description = "Does NOT contain 'C'"; break;
-        }
+        newQuest.tier2Description = GetTier2Description(newQuest.tier2Rule);
 
         return newQuest;
     }
@@ -184,6 +125,7 @@ public class QuestManager : MonoBehaviour
         if (rule == Tier2Type.No_Letter_S && (prefix == "SH" || prefix == "ST")) return true;
         if (rule == Tier2Type.No_Letter_C && prefix == "CH") return true;
         if (rule == Tier2Type.No_Letter_T && (prefix == "TH" || prefix == "ST")) return true;
+        if (rule == Tier2Type.EndsWith_ER && prefix == "K") return true;
 
         // NEW: Goal 2 - Exclude J, K, and Y from 6+ Exact Length constraints!
         if (rule == Tier2Type.ExactLength_6 || rule == Tier2Type.ExactLength_7 || 
@@ -193,5 +135,110 @@ public class QuestManager : MonoBehaviour
         }
 
         return false; 
+    }
+
+    public Tier2Type[] GetSpellRules(SpellType chosenSpell)
+    {
+        switch (chosenSpell)
+        {
+            // OFFENSIVE
+            case SpellType.MagicMissiles: return new[] { Tier2Type.None };
+            case SpellType.WindBlast: return new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ED, Tier2Type.EndsWith_ER };
+            case SpellType.FireBlast: return new[] { Tier2Type.ExactLength_5, Tier2Type.ExactLength_6, Tier2Type.ExactLength_7, Tier2Type.ExactLength_8 };
+            case SpellType.FrostSpikes: return new[] { Tier2Type.No_Letter_T, Tier2Type.No_Letter_R, Tier2Type.No_Letter_S, Tier2Type.No_Letter_U };
+            case SpellType.EarthThrow: return new[] { Tier2Type.No_Letter_U, Tier2Type.No_Letter_O, Tier2Type.No_Letter_C, Tier2Type.No_Letter_P };
+            case SpellType.ThunderStrike: return new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 };
+            
+            // UTILITY
+            case SpellType.LesserShield: return new[] { Tier2Type.No_Letter_A, Tier2Type.No_Letter_O, Tier2Type.No_Letter_P, Tier2Type.No_Letter_C, Tier2Type.No_Letter_N };
+            case SpellType.FlameBarrier: return new[] { Tier2Type.EndsWith_Y, Tier2Type.EndsWith_E, Tier2Type.EndsWith_LY, Tier2Type.EndsWith_N };
+            case SpellType.ManaShield: return new[] { Tier2Type.MinLength_5, Tier2Type.MinLength_6, Tier2Type.MinLength_7, Tier2Type.MinLength_8 };
+            case SpellType.Focus: return new[] { Tier2Type.MinLength_6, Tier2Type.EndsWith_ING, Tier2Type.No_Letter_A };
+
+            // HEALING
+            case SpellType.LesserHeal: return new[] { Tier2Type.MinLength_5 };
+            case SpellType.Purify: return new[] { Tier2Type.ExactLength_4, Tier2Type.ExactLength_5, Tier2Type.ExactLength_6 };
+            case SpellType.GreaterHeal: return new[] { Tier2Type.EndsWith_S, Tier2Type.EndsWith_ING };
+
+            default: return new[] { Tier2Type.MinLength_5 };
+        }
+    }
+
+    public string GetTier2Description(Tier2Type rule)
+    {
+        switch (rule)
+        {
+            case Tier2Type.None: return "No secondary constraint";
+            case Tier2Type.ExactLength_4: return "Exactly 4 letters";
+            case Tier2Type.ExactLength_5: return "Exactly 5 letters";
+            case Tier2Type.ExactLength_6: return "Exactly 6 letters";
+            case Tier2Type.ExactLength_7: return "Exactly 7 letters";
+            case Tier2Type.ExactLength_8: return "Exactly 8 letters";
+            case Tier2Type.ExactLength_9: return "Exactly 9 letters";
+            case Tier2Type.MinLength_5: return "5 or more letters";
+            case Tier2Type.MinLength_6: return "6 or more letters";
+            case Tier2Type.MinLength_7: return "7 or more letters";
+            case Tier2Type.MinLength_8: return "8 or more letters";
+            case Tier2Type.EndsWith_S: return "Ends in -S or -ES";
+            case Tier2Type.EndsWith_ED: return "Ends in -D or -ED";
+            case Tier2Type.EndsWith_ER: return "Ends in -R or -ER";
+            case Tier2Type.EndsWith_ING: return "Ends in -ING";
+            case Tier2Type.EndsWith_LY: return "Ends in -LY";
+            case Tier2Type.EndsWith_Y: return "Ends in -Y";
+            case Tier2Type.EndsWith_T: return "Ends in -T";
+            case Tier2Type.EndsWith_N: return "Ends in -N";
+            case Tier2Type.EndsWith_E: return "Ends in -E";
+            case Tier2Type.EndsWith_TION: return "Ends in -TION";
+            case Tier2Type.No_Letter_A: return "Does NOT contain 'A'";
+            case Tier2Type.No_Letter_E: return "Does NOT contain 'E'";
+            case Tier2Type.No_Letter_I: return "Does NOT contain 'I'";
+            case Tier2Type.No_Letter_O: return "Does NOT contain 'O'";
+            case Tier2Type.No_Letter_U: return "Does NOT contain 'U'";
+            case Tier2Type.No_Letter_T: return "Does NOT contain 'T'";
+            case Tier2Type.No_Letter_S: return "Does NOT contain 'S'";
+            case Tier2Type.No_Letter_R: return "Does NOT contain 'R'";
+            case Tier2Type.No_Letter_N: return "Does NOT contain 'N'";
+            case Tier2Type.No_Letter_L: return "Does NOT contain 'L'";
+            case Tier2Type.No_Letter_P: return "Does NOT contain 'P'";
+            case Tier2Type.No_Letter_C: return "Does NOT contain 'C'";
+            default: return "";
+        }
+    }
+
+    public string RerollLetter(string currentLetter)
+    {
+        if (remainingLetters.Count == 0)
+        {
+            currentActiveGroup = (currentActiveGroup == group1) ? group2 : group1;
+            ResetRotation();
+        }
+
+        string newLetter = remainingLetters[0];
+        remainingLetters.RemoveAt(0);
+        remainingLetters.Add(currentLetter); // Place the discarded letter back at the bottom
+        return newLetter;
+    }
+
+    public Tier2Type RerollTier2Rule(SpellType chosenSpell, Tier2Type currentRule, string targetLetter)
+    {
+        Tier2Type[] spellRules = GetSpellRules(chosenSpell);
+        List<Tier2Type> validRules = new List<Tier2Type>();
+
+        foreach (var r in spellRules)
+        {
+            // Make sure the new rule is completely different, isn't blocking the new letter, and isn't a known unfair combo
+            if (r != currentRule && r.ToString() != "No_Letter_" + targetLetter && !IsUnfairCombo(targetLetter, r))
+            {
+                validRules.Add(r);
+            }
+        }
+
+        if (validRules.Count > 0)
+        {
+            return validRules[Random.Range(0, validRules.Count)];
+        }
+        
+        // Fallback if no other valid rules exist for that spell!
+        return currentRule;
     }
 }
